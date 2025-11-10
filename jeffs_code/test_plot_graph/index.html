@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Car Data Application</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            background: #444;
+            padding: 10px;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+            color: yellow
+        }
+        nav a:active {
+            color: orange; /* Change color when clicked */
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: rgb(228, 131, 20); /* Button color */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background-color: orange;
+        }
+        
+
+        main {
+            padding: 20px;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Race Car Data Dashboard</h1>
+    </header>
+   
+    <main>
+        <h2>Welcome to the Race Car Data Dashboard</h2>
+        <p>Select a page from the navigation above to explore race car data, graphs, or lap time predictions.</p>
+        <nav>
+            <a href="Pages/Data.html", class = "btn">Data Page</a>
+            <a href="Pages/Graph.html", class = "btn">Graph Page</a>
+            <a href="Pages/Prediction.html", class = "btn">Prediction Page</a>
+        </nav>
+    </main>
+
+    
+
+    <script>
+        // This script could manage app initialization or dynamic behavior
+        console.log("Application Loaded");
+    </script>
+</body>
+</html>

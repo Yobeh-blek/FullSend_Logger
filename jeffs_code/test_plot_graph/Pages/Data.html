@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Car Data Application</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            background: #444;
+            padding: 10px;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+            color: yellow
+        }
+        nav a:active {
+            color: orange; /* Change color when clicked */
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: rgb(228, 131, 20); /* Button color */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background-color: orange;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            align-items: center; /* Center horizontally */
+            justify-content: center; /* Center vertically (if needed) */
+            height: 100vh; /* Full screen height (optional) */
+            gap: 20px; /* Space between button and table */
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 60%; /* Adjust width as needed */
+            text-align: center;
+        }
+        
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+        }
+        
+        main {
+            padding: 20px;
+            text-align: center;
+        }
+
+
+
+    </style>
+</head>
+
+
+<body>
+    <header>
+        <h1> Data</h1>
+    </header>
+   
+    <main>
+        <h2>Data visualize</h2>
+        <p>Select a file</p>
+    </main>
+    <div class="container">
+        <input class="form-control" type="file" id="fileInput" accept=".csv">
+        <table id="csvTable" border="1">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                displayCSV(content);
+            };
+            reader.readAsText(file);
+        });
+        
+        function displayCSV(csvText) {
+            const rows = csvText.split("\n").map(row => row.split(",")); // Split rows and columns
+            const table = document.getElementById("csvTable");
+            
+            // Clear existing content
+            table.querySelector("thead").innerHTML = "";
+            table.querySelector("tbody").innerHTML = "";
+        
+            // Add header
+            let theadHTML = "<tr>";
+            rows[0].forEach(header => {
+                theadHTML += `<th>${header.trim()}</th>`;
+            });
+            theadHTML += "</tr>";
+            table.querySelector("thead").innerHTML = theadHTML;
+        
+            // Add rows
+            let tbodyHTML = "";
+            for (let i = 1; i < rows.length; i++) {
+                tbodyHTML += "<tr>";
+                rows[i].forEach(cell => {
+                    tbodyHTML += `<td>${cell.trim()}</td>`;
+                });
+                tbodyHTML += "</tr>";
+            }
+            table.querySelector("tbody").innerHTML = tbodyHTML;
+        }
+    </script>
+        
+        
+</body>
+</html>
