@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Race Data Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Race Data Dashboard</h1>
+  </header>
+
+  <div class="top-section">
+    <div class="box clickable" onclick="location.href='course.html'">
+      <h3>Course / Heading</h3>
+      <div class="heading-indicator">
+        <div class="arrow"></div>
+      </div>
+    </div>
+
+    <div class="box clickable" onclick="location.href='lap.html'">
+      <h3>Lap</h3>
+      <ul class="lap-times">
+        <li>Lap 3: <span class="lap-time">1:01.364s</span></li>
+        <li>Lap 2: <span class="lap-time">1:01.364s</span></li>
+        <li>Lap 1: <span class="lap-time">1:01.364s</span></li>
+      </ul>
+    </div>
+
+    <div class="box clickable" onclick="location.href='tire.html'">
+      <h3>Tire Temperature & Pressure</h3>
+      <div class="tire-grid">
+        <div class="tire green">Temp: 80°C<br>PSI: 28</div>
+        <div class="tire green">Temp: 81°C<br>PSI: 28</div>
+        <div class="tire orange">Temp: 95°C<br>PSI: 26</div>
+        <div class="tire red">Temp: 110°C<br>PSI: 24</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="browse-section">
+    <label for="fileInput">Browse:</label>
+    <input type="file" id="fileInput">
+  </div>
+
+  <section>
+    <h3>Brake</h3>
+    <canvas id="brakeChart"></canvas>
+  </section>
+
+  <section>
+    <h3>Gas</h3>
+    <canvas id="gasChart"></canvas>
+  </section>
+
+  <section>
+    <h3>Speed</h3>
+    <canvas id="speedChart"></canvas>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Example demo data
+    const labels = ['0s','1s','2s','3s','4s','5s'];
+
+    function createChart(id, label, data, color) {
+      new Chart(document.getElementById(id), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            fill: false,
+          }]
+        }
+      });
+    }
+
+    createChart('brakeChart', 'Brake', [0, 30, 10, 60, 40, 20], 'red');
+    createChart('gasChart', 'Gas', [20, 60, 90, 80, 100, 70], 'green');
+    createChart('speedChart', 'Speed', [0, 40, 70, 100, 90, 80], 'blue');
+  </script>
+</body>
+</html>

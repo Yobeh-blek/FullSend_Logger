@@ -1,0 +1,89 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f8f8f8;
+  margin: 0;
+  padding: 10px;
+}
+
+header {
+  text-align: center;
+  padding: 10px;
+}
+
+.top-section {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+}
+
+.box {
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  padding: 15px;
+  width: 30%;
+  text-align: center;
+  transition: 0.3s;
+}
+
+.box.clickable:hover {
+  cursor: pointer;
+  border-color: #555;
+  background: #f0f0f0;
+}
+
+.heading-indicator {
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.arrow {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 40px solid red;
+  transform: rotate(-45deg);
+}
+
+.lap-times {
+  list-style: none;
+  padding: 0;
+}
+
+.lap-time {
+  background: #0f0;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.tire-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+}
+
+.tire {
+  padding: 10px;
+  border-radius: 5px;
+  color: #fff;
+}
+
+.green { background: green; }
+.orange { background: orange; }
+.red { background: red; }
+
+.browse-section {
+  margin: 10px 0;
+  text-align: center;
+}
+
+section {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  margin: 10px 0;
+  padding: 10px;
+}
