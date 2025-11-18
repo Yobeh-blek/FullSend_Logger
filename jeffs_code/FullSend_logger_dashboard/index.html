@@ -44,24 +44,28 @@
   </div>
 
   <section>
+    <h3>Time vs Distance</h3>
+    <canvas id="time vs distance"></canvas>
+
+  <section>
     <h3>Brake</h3>
-    <canvas id="brakeChart"></canvas>
+    <canvas id="brakeChart vs distance"></canvas>
   </section>
 
   <section>
     <h3>Gas</h3>
-    <canvas id="gasChart"></canvas>
+    <canvas id="gasChart vs distance"></canvas>
   </section>
 
   <section>
     <h3>Speed</h3>
-    <canvas id="speedChart"></canvas>
+    <canvas id="speedChart vs distance"></canvas>
   </section>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     // Example demo data
-    const labels = ['0s','1s','2s','3s','4s','5s'];
+    const labels = ['0m','1m','2m','3m','4m','5m'];
 
     function createChart(id, label, data, color) {
       new Chart(document.getElementById(id), {
@@ -78,9 +82,10 @@
       });
     }
 
-    createChart('brakeChart', 'Brake', [0, 30, 10, 60, 40, 20], 'red');
-    createChart('gasChart', 'Gas', [20, 60, 90, 80, 100, 70], 'green');
-    createChart('speedChart', 'Speed', [0, 40, 70, 100, 90, 80], 'blue');
+    createChart('time vs distance', 'Time', [0, 30, 10, 60, 40, 20], 'red');
+    createChart('brakeChart vs distance', 'Brake', [20, 60, 90, 80, 100, 70], 'green');
+    createChart('gasChart vs distance', 'Gas', [0, 40, 70, 100, 90, 80], 'blue');
+    createChart('speedChart vs distance', 'Speed', [0, 15, 25, 30, 45, 60], 'blue');
   </script>
 </body>
 </html>
