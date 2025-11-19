@@ -32,7 +32,8 @@ Backward Compatibility:
 - [ ] No breaking changes
 
 - [ ] Has breaking changes (explain below)
-Changes:
+
+  Changes:
 <!-- Describe if applicable -->
 🧪 Testing & Validation
 
