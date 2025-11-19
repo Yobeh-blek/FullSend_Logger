@@ -1,0 +1,72 @@
+🚀 Pull Request Template
+📌 Branch Information
+
+Target Branch:
+
+<!-- Example: main / develop -->
+
+Source Branch:
+
+<!-- Example: feature/add-gps-logger, bugfix/fix-imu-speed-calc -->
+📝 Feature / Bugfix Description
+
+What does this PR do?
+
+<!-- Provide a clear summary of the feature or bugfix -->
+
+Specification / Requirements:
+
+<!-- Describe the functional requirements or acceptance criteria -->
+📂 Resource / System Impact
+
+Affected Modules / Files:
+i.e: SD card function modules
+<!-- List major files, services, or components impacted -->
+
+Performance Impact:
+i.e: 30ms slower
+<!-- E.g., CPU, memory, network, flash usage -->
+
+Backward Compatibility:
+
+- [ ] No breaking changes
+
+- [ ] Has breaking changes (explain below)
+
+  Changes:
+<!-- Describe if applicable -->
+🧪 Testing & Validation
+
+Test Environment:
+
+<!-- Example: ESP32-S3, Zephyr v3.6.0, Chrome browser, iOS, etc. -->
+
+Test Steps Performed:
+
+<!-- List your exact steps to verify this PR -->
+
+Test Results:
+
+<!-- What worked, screenshots if needed -->
+✅ Author Checklist
+
+Please ensure the following before requesting review:
+
+- [ ] Code compiles without errors
+
+- [ ] Follows project coding style
+
+- [ ] No unused variables / debug prints
+
+- [ ] All new logic is documented
+
+- [ ] Added/updated tests (if applicable)
+
+- [ ] Verified behavior on both develop and main compatibility
+
+- [ ] Branch name follows convention (feature/*, bugfix/*)
+
+- [ ] No secret keys / passwords / sensitive data committed
+
+📎 Additional Notes (Optional)
+<!-- Anything the reviewer should know? Limitations? Known issues? -->
