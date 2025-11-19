@@ -20,19 +20,19 @@ Specification / Requirements:
 📂 Resource / System Impact
 
 Affected Modules / Files:
-
+i.e: SD card function modules
 <!-- List major files, services, or components impacted -->
 
 Performance Impact:
-
+i.e: 30ms slower
 <!-- E.g., CPU, memory, network, flash usage -->
 
 Backward Compatibility:
 
- No breaking changes
+- [ ] No breaking changes
 
- Has breaking changes (explain below)
-
+- [ ] Has breaking changes (explain below)
+Changes:
 <!-- Describe if applicable -->
 🧪 Testing & Validation
 
@@ -51,21 +51,21 @@ Test Results:
 
 Please ensure the following before requesting review:
 
- Code compiles without errors
+- [ ] Code compiles without errors
 
- Follows project coding style
+- [ ] Follows project coding style
 
- No unused variables / debug prints
+- [ ] No unused variables / debug prints
 
- All new logic is documented
+- [ ] All new logic is documented
 
- Added/updated tests (if applicable)
+- [ ] Added/updated tests (if applicable)
 
- Verified behavior on both develop and main compatibility
+- [ ] Verified behavior on both develop and main compatibility
 
- Branch name follows convention (feature/*, bugfix/*)
+- [ ] Branch name follows convention (feature/*, bugfix/*)
 
- No secret keys / passwords / sensitive data committed
+- [ ] No secret keys / passwords / sensitive data committed
 
 📎 Additional Notes (Optional)
 <!-- Anything the reviewer should know? Limitations? Known issues? -->
