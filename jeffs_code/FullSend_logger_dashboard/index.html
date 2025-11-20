@@ -2,69 +2,124 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Race Data Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Race Data Dashboard</h1>
+  <header class="bg-dark text-white py-4 mb-4">
+    <div class="container">
+      <h1 class="mb-0">Race Data Dashboard</h1>
+    </div>
   </header>
 
-  <div class="top-section">
-    <div class="box clickable" onclick="location.href='course.html'">
-      <h3>Course / Heading</h3>
-      <div class="heading-indicator">
-        <div class="arrow"></div>
+  <div class="container">
+    <div class="row mb-4 top-section">
+      <div class="col-md-4 mb-3">
+        <div class="card h-100 clickable" onclick="location.href='course.html'" role="button">
+          <div class="card-body text-center">
+            <h5 class="card-title">Course / Heading</h5>
+            <div class="heading-indicator">
+              <div class="arrow"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="card h-100 clickable" onclick="location.href='lap.html'" role="button">
+          <div class="card-body">
+            <h5 class="card-title">Lap Times</h5>
+            <ul class="list-unstyled">
+              <li class="mb-2">Lap 3: <span class="badge bg-success">1:01.364s</span></li>
+              <li class="mb-2">Lap 2: <span class="badge bg-success">1:01.364s</span></li>
+              <li>Lap 1: <span class="badge bg-success">1:01.364s</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <div class="card h-100 clickable" onclick="location.href='tire.html'" role="button">
+          <div class="card-body">
+            <h5 class="card-title">Tire Temperature & Pressure</h5>
+            <div class="row g-2">
+              <div class="col-6"><div class="alert alert-success mb-0 p-2"><small>Temp: 80°C<br>PSI: 28</small></div></div>
+              <div class="col-6"><div class="alert alert-success mb-0 p-2"><small>Temp: 81°C<br>PSI: 28</small></div></div>
+              <div class="col-6"><div class="alert alert-warning mb-0 p-2"><small>Temp: 95°C<br>PSI: 26</small></div></div>
+              <div class="col-6"><div class="alert alert-danger mb-0 p-2"><small>Temp: 110°C<br>PSI: 24</small></div></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="box clickable" onclick="location.href='lap.html'">
-      <h3>Lap</h3>
-      <ul class="lap-times">
-        <li>Lap 3: <span class="lap-time">1:01.364s</span></li>
-        <li>Lap 2: <span class="lap-time">1:01.364s</span></li>
-        <li>Lap 1: <span class="lap-time">1:01.364s</span></li>
-      </ul>
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <label for="fileInput" class="form-label"><strong>Browse Files:</strong></label>
+            <input type="file" id="fileInput" class="form-control">
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="box clickable" onclick="location.href='tire.html'">
-      <h3>Tire Temperature & Pressure</h3>
-      <div class="tire-grid">
-        <div class="tire green">Temp: 80°C<br>PSI: 28</div>
-        <div class="tire green">Temp: 81°C<br>PSI: 28</div>
-        <div class="tire orange">Temp: 95°C<br>PSI: 26</div>
-        <div class="tire red">Temp: 110°C<br>PSI: 24</div>
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Time vs Distance</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="time vs distance"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Speed</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="speedChart vs distance"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Brake</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="brakeChart vs distance"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Gas</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="gasChart vs distance"></canvas>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="browse-section">
-    <label for="fileInput">Browse:</label>
-    <input type="file" id="fileInput">
-  </div>
+  <footer class="bg-dark text-white text-center py-3 mt-5">
+    <p class="mb-0">&copy; 2025 Race Data Dashboard</p>
+  </footer>
 
-  <section>
-    <h3>Time vs Distance</h3>
-    <canvas id="time vs distance"></canvas>
-
-  <section>
-    <h3>Brake</h3>
-    <canvas id="brakeChart vs distance"></canvas>
-  </section>
-
-  <section>
-    <h3>Gas</h3>
-    <canvas id="gasChart vs distance"></canvas>
-  </section>
-
-  <section>
-    <h3>Speed</h3>
-    <canvas id="speedChart vs distance"></canvas>
-  </section>
-
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    // Example demo data
     const labels = ['0m','1m','2m','3m','4m','5m'];
 
     function createChart(id, label, data, color) {

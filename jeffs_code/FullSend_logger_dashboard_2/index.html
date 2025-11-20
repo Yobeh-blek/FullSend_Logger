@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Full Send Logger — Race Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- JSZip for creating folder zip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <img src="/mnt/data/0ceb795b-4fc5-47d5-a43c-0e012ae30f26.png" alt="layout" class="hero-img" />
+      <h1>Full Send Logger</h1>
+    </header>
+
+    <!-- Main SPA container -->
+    <main class="main-grid">
+      <!-- Left column: File panel -->
+      <section class="panel file-panel">
+        <h2>File</h2>
+        <div class="file-controls">
+          <button id="btnBrowseLayouts">Browse</button>
+          <button id="btnOpenHistory">Open</button>
+          <button id="btnSaveData">Save</button>
+          <button id="btnCancelFile">Cancel</button>
+          <hr />
+          <label class="small">Selected layout:</label>
+          <div id="selectedLayout" class="selected-value">— none —</div>
+
+          <div style="margin-top:12px;">
+            <input type="file" id="layoutFilesInput" accept=".json,.csv,.zip" multiple style="display:none" />
+            <input type="file" id="historyFileInput" accept=".csv,text/csv" style="display:none" />
+          </div>
+
+          <button id="btnCreateLayoutZip" title="Create folder + CSV (download ZIP)">Create Layout Folder</button>
+        </div>
+      </section>
+
+      <!-- Middle column: Radio Comm -->
+      <section class="panel radio-panel">
+        <h2>Radio Comm</h2>
+        <div class="comm-controls">
+          <label>Com Port</label>
+          <select id="radioPortSelect">
+            <option value="">(not connected)</option>
+          </select>
+          <label>Baudrate</label>
+          <select id="radioBaud">
+            <option>9600</option>
+            <option>19200</option>
+            <option>38400</option>
+            <option selected>115200</option>
+          </select>
+          <button id="btnRadioConnect">Connect</button>
+        </div>
+      </section>
+
+      <!-- Right column: Data Comm -->
+      <section class="panel data-panel">
+        <h2>Data</h2>
+        <div class="comm-controls">
+          <label>Com Port</label>
+          <select id="dataPortSelect">
+            <option value="">(not connected)</option>
+          </select>
+          <label>Baudrate</label>
+          <select id="dataBaud">
+            <option>9600</option>
+            <option>19200</option>
+            <option>38400</option>
+            <option selected>115200</option>
+          </select>
+          <button id="btnDataConnect">Data Page</button>
+        </div>
+      </section>
+
+      <!-- Full width: History -->
+      <section class="panel history-panel">
+        <h2>History</h2>
+        <div class="history-wrapper">
+          <div id="historyList" class="history-list" tabindex="0"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Dashboard view (hidden by default) -->
+  <div id="dashboard" class="page" style="display:none;">
+    <nav class="topbar">
+      <button id="backToMain">&larr; Back</button>
+      <div class="topbar-title" id="dashTrackName">Track: —</div>
+      <div class="topbar-actions">
+        <button id="gotoCompare">Lap Compare</button>
+        <button id="downloadSession">Download Session CSV</button>
+      </div>
+    </nav>
+
+    <section class="dash-grid">
+      <div class="dash-top-left card">
+        <h3>Car Heading</h3>
+        <div id="headingIndicator" class="heading-indicator">0°</div>
+      </div>
+      <div class="dash-top-center card">
+        <h3>Lap Time</h3>
+        <div id="lapTime" class="lap-time">00:00.000</div>
+      </div>
+      <div class="dash-top-right card">
+        <h3>Tires / Pressure</h3>
+        <div id="tireTemp">FL: —</div>
+        <div id="tirePressure">Pressure: —</div>
+      </div>
+
+      <div class="dash-charts card" id="chartsContainer">
+        <canvas id="chartSpeed"></canvas>
+      </div>
+
+      <div class="dash-charts card" id="chartsContainer2">
+        <canvas id="chartTimeDistance"></canvas>
+      </div>
+
+      <div class="dash-data card">
+        <h3>Live Data (scroll)</h3>
+        <div class="table-scroll">
+          <table id="liveDataTable">
+            <thead>
+              <tr><th>Time</th><th>Distance</th><th>Speed</th><th>Brake</th><th>Gas</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Lap compare page -->
+  <div id="compare" class="page" style="display:none;">
+    <nav class="topbar">
+      <button id="backFromCompare">&larr; Back</button>
+      <div class="topbar-title">Lap Comparison</div>
+    </nav>
+    <section class="compare-grid">
+      <div class="compare-controls card">
+        <h3>Select laps to compare</h3>
+        <div id="lapSelectionArea"></div>
+        <button id="compareButton">Compare</button>
+      </div>
+
+      <div class="compare-charts card">
+        <canvas id="compareChart"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
