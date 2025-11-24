@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Full Send Logger - Local UI</title>
+  <style>
+    :root{
+      --bg:#0f0e13; --panel:#1b1a20; --accent:#5d5cff; --glass:#6f808b;
+      --filePanel:#8aa0ad; --radioPanel:#6f2bff; --dataPanel:#dbdb3b; --history:#38b6e6;
+      --darkBtn:#0b0b0d; --btnBorder:#e6e6e6;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0b0f 0%, #141219 100%);color:#fff}
+    .container{max-width:980px;margin:18px auto;padding:18px;border:2px solid #fff1;position:relative;background:transparent}
+    header{display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+    header h1{background:rgba(255,255,255,0.03);padding:10px 30px;border-radius:10px;border:2px solid rgba(255,255,255,0.15);font-weight:400}
+    .top-left-home{position:absolute;left:24px;top:24px;width:46px;height:46px;background:rgba(255,255,255,0.03);border-radius:6px;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,0.06)}
+    .layout{display:flex;gap:20px;justify-content:space-between}
+    .panel{flex:1;padding:18px;border-radius:22px;min-height:220px;display:flex;flex-direction:column;align-items:center;gap:12px}
+
+    /* left file panel */
+    .file{background:var(--filePanel); color:#fff;align-items:flex-start}
+    .panel .title{background:var(--darkBtn);padding:8px 18px;border-radius:8px;border:2px solid var(--btnBorder)}
+    .file .controls{margin-top:10px;width:100%;display:flex;flex-direction:column;gap:12px}
+    .btn{background:var(--darkBtn);padding:8px 16px;border-radius:8px;border:2px solid var(--btnBorder);cursor:pointer;text-align:center}
+
+    /* middle radio */
+    .radio{background:var(--radioPanel);display:flex;align-items:center;justify-content:center}
+    .radio .inner{width:70%;text-align:center}
+    .radio .enter{background:orange;padding:16px;border-radius:12px;border:3px solid rgba(255,255,255,0.5);cursor:pointer}
+
+    /* right data */
+    .data{background:var(--dataPanel);display:flex;align-items:center;justify-content:center}
+    .data .enter{background:#ff2e8c;padding:16px;border-radius:12px;border:3px solid rgba(255,255,255,0.5);cursor:pointer}
+
+    /* history */
+    .historyWrap{margin-top:22px;background:var(--history);padding:18px;border-radius:22px;}
+    .historyWrap h2{margin:0 0 12px 0;text-align:center;font-weight:400}
+    .history{background:rgba(0,0,0,0.9);height:160px;border-radius:6px;padding:8px;overflow:auto}
+    .logLine{height:20px;background:#05060a;margin:8px 0;border-radius:2px;border:3px solid rgba(0,150,255,0.07)}
+
+    /* home icon using the uploaded image as small crop */
+    .home-icon{width:28px;height:28px;background-image:url('/mnt/data/79f9e61b-f43b-4a72-bb42-bbdd9cf34be9.png');background-size:420px;background-position:8px 8px;border-radius:4px}
+
+    /* responsive */
+    @media(max-width:920px){.layout{flex-direction:column}.panel{min-height:150px}}
+
+    /* small helpers */
+    label.select{display:block;background:#0b0b0f;padding:8px;border-radius:6px;border:2px solid rgba(255,255,255,0.08);width:100%;text-align:center}
+    input[type=file]{display:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-left-home"><div class="home-icon" title="home icon"></div></div>
+    <header><h1>Full Send Logger</h1></header>
+
+    <div class="layout">
+      <div class="panel file">
+        <div class="title">File</div>
+        <div class="controls">
+          <label class="btn" id="browseBtn">Browse</label>
+          <input id="fileInput" type="file" />
+          <div class="btn" id="openBtn">Open</div>
+          <div class="btn" id="saveBtn">Save</div>
+          <div class="btn" id="cancelBtn">Cancel</div>
+        </div>
+      </div>
+
+      <div class="panel radio">
+        <div class="inner">
+          <div class="title">Radio Comm</div>
+          <div style="margin-top:10px">
+            <label class="select">COM Port<br><small id="comLabel">--</small></label>
+            <label class="select">Baudrate<br><small id="baudLabel">115200</small></label>
+          </div>
+          <div style="margin-top:14px" class="enter" id="radioEnter">Enter</div>
+        </div>
+      </div>
+
+      <div class="panel data">
+        <div class="inner">
+          <div class="title">Data</div>
+          <div style="margin-top:10px">
+            <label class="select">COM Port<br><small>--</small></label>
+            <label class="select">Baudrate<br><small>115200</small></label>
+          </div>
+          <div style="margin-top:14px" class="enter" id="dataEnter">Enter</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="historyWrap">
+      <h2>History</h2>
+      <div class="history" id="historyArea">
+        <!-- log lines generated by JS to mimic the UI in your image -->
+        <div class="logLine"></div>
+        <div class="logLine"></div>
+        <div class="logLine"></div>
+        <div class="logLine"></div>
+        <div class="logLine"></div>
+        <div class="logLine"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Simple interactive behaviors for the single-file demo
+    const browseBtn = document.getElementById('browseBtn');
+    const fileInput = document.getElementById('fileInput');
+    const openBtn = document.getElementById('openBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const historyArea = document.getElementById('historyArea');
+    const radioEnter = document.getElementById('radioEnter');
+    const dataEnter = document.getElementById('dataEnter');
+
+    browseBtn.addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files[0];
+      if(f){ browseBtn.textContent = f.name; }
+      addLog(`Selected file: ${f?f.name:'(none)'}`);
+    });
+    });
+    openBtn.addEventListener('click', ()=> addLog('Open pressed — (demo)'));
+    saveBtn.addEventListener('click', ()=> addLog('Save pressed — (demo)'));
+    cancelBtn.addEventListener('click', ()=> addLog('Cancel pressed'));
+    radioEnter.addEventListener('click', ()=> addLog('Entered Radio Comm'));
+    dataEnter.addEventListener('click', ()=> addLog('Entered Data View'));
+
+    function addLog(t){
+      const d = document.createElement('div');
+      d.className='logLine';
+      d.textContent = t;
+      d.style.height='20px';
+      d.style.padding='4px';
+      d.style.color='#bde';
+      d.style.display='flex';
+      d.style.alignItems='center';
+      d.style.fontSize='12px';
+      historyArea.appendChild(d);
+      historyArea.scrollTop = historyArea.scrollHeight;
+    }
+
+    // preload some demo messages
+    ['System ready','Last file loaded: session.csv','Radio: COM3 connected','Data stream: 1.2MB received'].forEach(addLog);
+  </script>
+</body>
+</html>
