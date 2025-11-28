@@ -2,75 +2,621 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Lap Dashboard</title>
+<title>Lap Analysis — Compare Laps (0.1m resample)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body{margin:0;background:#0b0b0f;color:white;font-family:Segoe UI,Roboto,sans-serif;padding:20px}
-  .backBtn{width:50px;height:50px;background:#0af;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;user-select:none}
-  .header{display:flex;align-items:center;gap:20px;margin-bottom:20px}
-  .section{background:#111;border:2px solid #444;border-radius:16px;padding:20px;margin-bottom:20px}
-  .graph{height:150px;background:#000;border-radius:12px;border:2px solid #333;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+  :root{
+    --bg:#0b0b0f; --panel:#111; --accent:#ffb86b; --muted:#444; --text:#fff;
+  }
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,Roboto,Arial;padding:18px}
+  .top{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .btn{background:var(--muted);color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;border:0}
+  .btn.primary{background:#3a86ff}
+  .panel{background:var(--panel);padding:12px;border-radius:10px;border:1px solid #2a2a2a}
+  .headingBox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:68px}
+  .headingArrow{width:48px;height:48px;border-radius:24px;border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform 0.3s ease}
+  .headingText{font-size:13px;color:#ddd}
+  .playbackInfo{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .playbackInfo .small{margin:0}
+  .header{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .backBtn{background:var(--panel);color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer;border:1px solid #333;user-select:none}
+  .controls{display:flex;gap:8px;align-items:center}
+  .select-lap{min-width:160px;padding:8px;border-radius:6px;background:#0b0b0f;border:1px solid #333;color:#fff}
+  .flex-row{display:flex;gap:12px;align-items:flex-start}
+  .col{flex:1;min-width:250px}
+  .small{font-size:13px;color:#ddd}
+  .chartWrap{height:240px;background:#080808;border-radius:8px;padding:8px;border:1px solid #222}
+  .status{margin-top:8px;font-size:13px;color:#cfcfcf}
+  input[type=file]{display:none}
+  label.fileBtn{background:#666;padding:8px 12px;border-radius:6px;cursor:pointer}
+  .playback{display:flex;gap:8px;align-items:center}
+  .meter{font-family:monospace;background:#0b0b0f;padding:6px 8px;border-radius:6px;border:1px solid #333}
+  .stat{display:flex;flex-direction:column;align-items:center;min-width:80px;gap:3px}
+  .stat .small{font-size:12px;color:#aaa;margin:0}
 </style>
 </head>
 <body>
+
 <div class="header">
-  <div class="backBtn" id="closeTab">⟵</div>
-  <h2 id="lapTitle">Lap Dashboard</h2>
+  <div class="backBtn" id="closeTab" role="button" tabindex="0" aria-label="Back">⟵</div>
+  <h2 style="margin:0;background:#0b0b0f;padding:10px 20px;border-radius:10px;border:2px solid #555;">Lap Analysis</h2>
 </div>
 
-<div class="section">
-  <h3>Lap Time</h3>
-  <div id="lapTimeBox" style="font-size:22px;font-weight:bold;color:#0f0;">--</div>
-</div>
+  <div class="panel controls">
+    <button id="selectLapA" class="btn">Select Lap A</button>
+    <select id="lapASelect" class="select-lap"></select>
+    <button id="selectLapB" class="btn">Select Lap B</button>
+    <select id="lapBSelect" class="select-lap"></select>
+    <button id="clearSel" class="btn">Clear</button>
+  </div>
 
-<div class="section">
-  <h3>G-meter</h3>
-  <div style="width:260px;height:260px;border-radius:130px;border:3px solid #777;position:relative;">
-    <div id="gDot" style="width:20px;height:20px;background:red;border-radius:50%;position:absolute;left:120px;top:120px;"></div>
+  <div style="margin-left:auto" class="panel controls playbackPanel">
+    <div class="playback" role="group" aria-label="Playback controls">
+      <button id="playBtn" class="btn primary">Play</button>
+      <button id="pauseBtn" class="btn">Pause</button>
+      <button id="stopBtn" class="btn">Stop</button>
+      <div style="display:flex;flex-direction:column;margin-left:10px">
+        <label class="small">Interval(ms per 0.1m)</label>
+        <input id="intervalInput" type="number" value="50" min="10" style="width:90px;padding:6px;border-radius:6px;border:1px solid #333;background:#0b0b0f;color:#fff">
+      </div>
+    </div>
+    <div class="playbackInfo" aria-live="polite" role="status">
+      <div class="stat"><div class="small">Distance</div><div id="currentDistance" class="meter">0.0m</div></div>
+      <div class="stat"><div class="small">Step</div><div id="currentStep" class="meter">0</div></div>
+      <div class="stat"><div class="small">Max</div><div id="maxDistance" class="meter">0.0m</div></div>
+      <!-- small headings duplicates for quick glance -->
+      <div class="headingBox" style="margin-left:12px">
+        <div class="small">Lap A</div>
+        <div class="headingArrow" id="headingArrowA_small" style="border-color:#ffd54a;color:#ffd54a">➤</div>
+        <div id="headingLabelA_small" class="headingText">N/A</div>
+      </div>
+      <div class="headingBox">
+        <div class="small">Lap B</div>
+        <div class="headingArrow" id="headingArrowB_small" style="border-color:#9b59b6;color:#9b59b6">➤</div>
+        <div id="headingLabelB_small" class="headingText">N/A</div>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="section">
-  <h3>Wheel Speed (RPM)</h3>
-  <div id="wheelSpeedBox"></div>
-</div>
-
-<div class="section">
-  <h3>Steering Wheel</h3>
-  <div style="display:flex;gap:20px;">
-    <div style="width:140px;height:140px;border-radius:70px;border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:48px;">↺</div>
-    <div style="width:140px;height:140px;border-radius:70px;border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:48px;">↻</div>
+<div style="display:flex;gap:12px;margin-bottom:12px">
+  <div class="col panel">
+    <div style="margin-bottom:8px"><strong>File:</strong> <span id="fileName" class="small">(none)</span></div>
+    <div class="small">Legend: <span style="color:#ffd54a">Lap A</span> vs <span style="color:#9b59b6">Lap B</span></div>
+    <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
+      <div class="headingBox">
+        <div class="small">Lap A</div>
+        <div class="headingArrow" id="headingArrowA" style="border-color:#ffd54a;color:#ffd54a">➤</div>
+        <div id="headingLabelA" class="headingText">N/A</div>
+      </div>
+      <div class="headingBox">
+        <div class="small">Lap B</div>
+        <div class="headingArrow" id="headingArrowB" style="border-color:#9b59b6;color:#9b59b6">➤</div>
+        <div id="headingLabelB" class="headingText">N/A</div>
+      </div>
+    </div>
+    <div class="status" id="status">No file loaded.</div>
   </div>
+
+  <!-- Playback column removed, controls & info merged into the top-right panel -->
 </div>
 
-<div class="section">
-  <h3>Sectors</h3>
-  <div id="sectorBox"></div>
-</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div class="panel">
+    <div style="margin-bottom:8px"><strong>Time vs Distance</strong></div>
+    <div class="chartWrap"><canvas id="chartTime"></canvas></div>
+  </div>
 
-<div class="section">
-  <h3>Graphs</h3>
-  <div class="graph">Time vs Distance</div>
-  <div class="graph">Brake vs Distance</div>
-  <div class="graph">Gas vs Distance</div>
-  <div class="graph">Speed vs Distance</div>
-  <div class="graph">Tire Status vs Distance</div>
+  <div class="panel">
+    <div style="margin-bottom:8px"><strong>Speed vs Distance</strong></div>
+    <div class="chartWrap"><canvas id="chartSpeed"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div style="margin-bottom:8px"><strong>Brake vs Distance</strong></div>
+    <div class="chartWrap"><canvas id="chartBrake"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div style="margin-bottom:8px"><strong>Gas vs Distance</strong></div>
+    <div class="chartWrap"><canvas id="chartGas"></canvas></div>
+  </div>
 </div>
 
 <script>
-  document.getElementById('closeTab').onclick = ()=> window.close();
-  const urlParams = new URLSearchParams(window.location.search);
-  const lap = urlParams.get('lap');
-  document.getElementById('lapTitle').textContent = `Lap ${lap} Dashboard`;
-  
-  // Display lap time from localStorage
-  const lapTime = localStorage.getItem(`lap_${lap}_time`) || '--';
-  const lapDifference = localStorage.getItem(`lap_${lap}_difference`) || '--';
-  const displayText = lapDifference === '--' ? lapTime : `${lapTime} (${lapDifference > 0 ? '+' : ''}${lapDifference}s)`;
-  document.getElementById('lapTimeBox').textContent = displayText;
-  
-  document.getElementById('wheelSpeedBox').innerHTML = localStorage.getItem(`lap_${lap}_speed`) || 'No data';
-  document.getElementById('sectorBox').innerHTML = localStorage.getItem(`lap_${lap}_sectors`) || 'No sector data';
-</script>
+/*
+Assumptions about CSV:
+- CSV contains header row.
+- Expected columns (if present): lap, distance, time, speed, brake, gas, heading, wheel_fl, wheel_fr, wheel_rl, wheel_rr, steering
+- If 'lap' column missing -> whole file treated as lap 1
+- Distance unit assumed meters
+- Time assumed in seconds (or format like mm:ss.mmm will be attempted to parse)
+*/
 
+const fileInput = document.getElementById('fileInput');
+const fileNameSpan = document.getElementById('fileName');
+const statusEl = document.getElementById('status');
+
+const selectLapA = document.getElementById('selectLapA');
+const selectLapB = document.getElementById('selectLapB');
+const lapASelect = document.getElementById('lapASelect');
+const lapBSelect = document.getElementById('lapBSelect');
+const clearSel = document.getElementById('clearSel');
+
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const intervalInput = document.getElementById('intervalInput');
+
+const currentDistanceEl = document.getElementById('currentDistance');
+const currentStepEl = document.getElementById('currentStep');
+const maxDistanceEl = document.getElementById('maxDistance');
+const headingArrowA = document.getElementById('headingArrowA');
+const headingLabelA = document.getElementById('headingLabelA');
+const headingArrowB = document.getElementById('headingArrowB');
+const headingLabelB = document.getElementById('headingLabelB');
+// small heading duplicates shown in the merged playback panel
+const headingArrowA_small = document.getElementById('headingArrowA_small');
+const headingLabelA_small = document.getElementById('headingLabelA_small');
+const headingArrowB_small = document.getElementById('headingArrowB_small');
+const headingLabelB_small = document.getElementById('headingLabelB_small');
+
+let parsedData = {}; // { lapNumber: [{distance:..., time:..., speed:..., ...}, ...] }
+let availableLaps = [];
+let resampled = {};  // { lapNumber: {dist:[], time:[], speed:[], brake:[], gas:[]} }
+let grid = []; // 0..max step 0.1
+let lapA = null, lapB = null;
+
+let playTimer = null;
+let playIndex = 0;
+// If the page is opened with ?lap=123, capture it and preselect later after CSV loaded
+const initialLapParam = (new URLSearchParams(window.location.search)).get('lap');
+
+/////////////////////// Simple CSV parser ///////////////////////
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length === 1 && cols[0].trim() === '') continue;
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = (cols[j] !== undefined) ? cols[j].trim() : '';
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+/////////////////// Helpers /////////////////////
+function toNumber(v, fallback = NaN) {
+  if (v === undefined || v === null || v === '') return fallback;
+  const n = Number(v);
+  if (!isNaN(n)) return n;
+  // try to parse time-like mm:ss.mmm -> convert to seconds
+  const m = String(v).match(/(\d+):(\d+)\.(\d+)/);
+  if (m) {
+    return parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3]) / (m[3].length === 3 ? 1000 : 1);
+  }
+  // fallback remove non-numeric
+  const cleaned = String(v).replace(/[^\d\.\-e]/g,'');
+  return cleaned === '' ? fallback : Number(cleaned);
+}
+
+function getUniqueLaps(rows) {
+  const laps = new Set();
+  rows.forEach(r => {
+    if (r.lap !== undefined) laps.add(r.lap);
+  });
+  return Array.from(laps).sort((a,b) => Number(a)-Number(b));
+}
+
+// Update heading display for a lap at a given index (defaults to 0)
+function setHeadingForLap(lap, arrowEl, labelEl, idx=0) {
+  if (!arrowEl || !labelEl) return;
+  if (!lap || !resampled[lap] || !Array.isArray(resampled[lap].heading)) {
+    labelEl.textContent = 'N/A';
+    arrowEl.style.transform = 'rotate(0deg)';
+    return;
+  }
+  const arr = resampled[lap].heading;
+  const i = Math.min(Math.max(0, idx || 0), arr.length - 1);
+  const h = arr[i];
+  if (h === undefined || isNaN(Number(h))) {
+    labelEl.textContent = 'N/A';
+    arrowEl.style.transform = 'rotate(0deg)';
+  } else {
+    arrowEl.style.transform = `rotate(${Number(h)}deg)`;
+    labelEl.textContent = `${Number(h).toFixed(0)}°`;
+  }
+}
+
+// Format distance as 0.0m (no space)
+function formatDistance(v) {
+  if (typeof v !== 'number' || isNaN(v)) return '0.0m';
+  return `${v.toFixed(1)}m`;
+}
+
+////////////////// Interpolation ////////////////////
+// linear interpolate array at given grid distances
+function interpolateArray(points, fieldName, gridArr) {
+  // points: [{distance, ...}, ...] sorted by distance
+  const res = new Array(gridArr.length).fill(NaN);
+  if (points.length === 0) return res;
+  // Build arrays
+  const xs = points.map(p => toNumber(p.distance, 0));
+  const ys = points.map(p => toNumber(p[fieldName], NaN));
+  // For each grid x, find enclosing segment
+  let i = 0;
+  for (let g = 0; g < gridArr.length; g++) {
+    const x = gridArr[g];
+    while (i < xs.length - 2 && x > xs[i+1]) i++;
+    if (x < xs[0]) {
+      res[g] = ys[0];
+    } else if (x > xs[xs.length-1]) {
+      res[g] = ys[ys.length-1];
+    } else {
+      const x0 = xs[i], x1 = xs[i+1];
+      const y0 = ys[i], y1 = ys[i+1];
+      if (isNaN(y0) || isNaN(y1) || x1 === x0) {
+        res[g] = isNaN(y0) ? y1 : y0;
+      } else {
+        const t = (x - x0) / (x1 - x0);
+        res[g] = y0 + t * (y1 - y0);
+      }
+    }
+  }
+  return res;
+}
+
+////////////////// Resample a lap to 0.1m grid ////////////////////
+function resampleLap(points, step = 0.1) {
+  if (!points || points.length === 0) return null;
+  // sort points by distance
+  points.sort((a,b) => toNumber(a.distance,0) - toNumber(b.distance,0));
+  const d0 = toNumber(points[0].distance, 0);
+  const dmax = toNumber(points[points.length-1].distance, 0);
+  const count = Math.floor((dmax - d0) / step) + 1;
+  const g = Array.from({length: count+1}, (_,i) => +(d0 + i*step).toFixed(3));
+  // pick fields to resample
+  const fields = ['time','speed','brake','gas','heading','wheel_fl','wheel_fr','wheel_rl','wheel_rr','steering'];
+  const out = { dist: g };
+  fields.forEach(f => {
+    out[f] = interpolateArray(points, f, g);
+  });
+  out.max = dmax;
+  return out;
+}
+
+////////////////// Chart setup ////////////////////
+const ctxTime = document.getElementById('chartTime').getContext('2d');
+const ctxSpeed = document.getElementById('chartSpeed').getContext('2d');
+const ctxBrake = document.getElementById('chartBrake').getContext('2d');
+const ctxGas = document.getElementById('chartGas').getContext('2d');
+
+function buildChart(ctx, label, yLabel) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#fff'}}},
+      scales:{
+        x:{ticks:{color:'#ddd'}, grid:{color:'#222'}},
+        y:{title:{display:true,text:yLabel,color:'#ddd'}, ticks:{color:'#ddd'}, grid:{color:'#222'}}
+      }
+    }
+  });
+}
+
+const chartTime = buildChart(ctxTime,'Time','Time (s)');
+const chartSpeed = buildChart(ctxSpeed,'Speed','Speed');
+const chartBrake = buildChart(ctxBrake,'Brake','Brake');
+const chartGas = buildChart(ctxGas,'Gas','Gas');
+
+function updateChartsForSelection() {
+  if (!grid.length) return;
+  const labels = grid.map(d => d.toFixed(1));
+  chartTime.data.labels = labels;
+  chartSpeed.data.labels = labels;
+  chartBrake.data.labels = labels;
+  chartGas.data.labels = labels;
+
+  const datasetsTime = [];
+  const datasetsSpeed = [];
+  const datasetsBrake = [];
+  const datasetsGas = [];
+
+  if (lapA && resampled[lapA]) {
+    datasetsTime.push({
+      label: `Lap ${lapA}`,
+      data: resampled[lapA].time.map(v => isNaN(v) ? null : +v),
+      borderColor: '#ffd54a',
+      borderWidth: 1.8,
+      pointRadius: 0
+    });
+    datasetsSpeed.push({
+      label: `Lap ${lapA}`,
+      data: resampled[lapA].speed.map(v => isNaN(v) ? null : +v),
+      borderColor: '#ffd54a',
+      borderWidth: 1.8, pointRadius:0
+    });
+    datasetsBrake.push({
+      label: `Lap ${lapA}`,
+      data: resampled[lapA].brake.map(v => isNaN(v) ? null : +v),
+      borderColor: '#ffd54a',
+      borderWidth: 1.8, pointRadius:0
+    });
+    datasetsGas.push({
+      label: `Lap ${lapA}`,
+      data: resampled[lapA].gas.map(v => isNaN(v) ? null : +v),
+      borderColor: '#ffd54a',
+      borderWidth: 1.8, pointRadius:0
+    });
+  }
+
+  if (lapB && resampled[lapB]) {
+    datasetsTime.push({
+      label: `Lap ${lapB}`,
+      data: resampled[lapB].time.map(v => isNaN(v) ? null : +v),
+      borderColor: '#9b59b6',
+      borderWidth: 1.8,
+      pointRadius: 0
+    });
+    datasetsSpeed.push({
+      label: `Lap ${lapB}`,
+      data: resampled[lapB].speed.map(v => isNaN(v) ? null : +v),
+      borderColor: '#9b59b6',
+      borderWidth: 1.8, pointRadius:0
+    });
+    datasetsBrake.push({
+      label: `Lap ${lapB}`,
+      data: resampled[lapB].brake.map(v => isNaN(v) ? null : +v),
+      borderColor: '#9b59b6',
+      borderWidth: 1.8, pointRadius:0
+    });
+    datasetsGas.push({
+      label: `Lap ${lapB}`,
+      data: resampled[lapB].gas.map(v => isNaN(v) ? null : +v),
+      borderColor: '#9b59b6',
+      borderWidth: 1.8, pointRadius:0
+    });
+  }
+
+  chartTime.data.datasets = datasetsTime;
+  chartSpeed.data.datasets = datasetsSpeed;
+  chartBrake.data.datasets = datasetsBrake;
+  chartGas.data.datasets = datasetsGas;
+
+  chartTime.update();
+  chartSpeed.update();
+  chartBrake.update();
+  chartGas.update();
+}
+
+///////////////////// Playback //////////////////////
+function startPlayback() {
+  if (!grid.length) {
+    alert('No resampled data available. Select laps first.');
+    return;
+  }
+  const interval = Math.max(10, Number(intervalInput.value) || 50);
+  stopPlayback();
+  playIndex = 0;
+  playTimer = setInterval(() => {
+    stepPlayback();
+    if (playIndex >= grid.length-1) {
+      stopPlayback();
+    }
+  }, interval);
+  statusEl.textContent = 'Playing...';
+}
+
+function stepPlayback() {
+  const d = grid[playIndex];
+  currentDistanceEl.textContent = formatDistance(d);
+  currentStepEl.textContent = `${playIndex}`;
+  // Update headings for lap A and lap B if available
+  if (lapA && resampled[lapA] && Array.isArray(resampled[lapA].heading)) {
+    setHeadingForLap(lapA, headingArrowA, headingLabelA, playIndex);
+    setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, playIndex);
+  }
+  if (lapB && resampled[lapB] && Array.isArray(resampled[lapB].heading)) {
+    setHeadingForLap(lapB, headingArrowB, headingLabelB, playIndex);
+    setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, playIndex);
+  }
+  // optional: update marker on charts by adding vertical line/annotation
+  // for performance we only update the charts' tooltip position (simple approach)
+  // Here we simply update nothing else — charts are prepopulated and show both laps.
+  playIndex++;
+}
+
+function pausePlayback() {
+  if (playTimer) {
+    clearInterval(playTimer); playTimer=null;
+    statusEl.textContent = 'Paused';
+  }
+}
+
+function stopPlayback() {
+  if (playTimer) {
+    clearInterval(playTimer); playTimer = null;
+  }
+  playIndex = 0;
+  currentDistanceEl.textContent = formatDistance(0);
+  currentStepEl.textContent = `0`;
+  statusEl.textContent = 'Stopped';
+  // reset heading to initial for both laps
+  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+}
+
+///////////////////// File handling ///////////////////////
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  fileNameSpan.textContent = f.name;
+  statusEl.textContent = 'Loading file...';
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const rows = parseCSV(ev.target.result);
+      onCSVLoaded(rows);
+      statusEl.textContent = 'File loaded. Select laps to compare.';
+    } catch (err) {
+      statusEl.textContent = 'Parse error: ' + err.message;
+    }
+  };
+  reader.readAsText(f);
+});
+
+function onCSVLoaded(rows) {
+  // Reset state
+  parsedData = {};
+  resampled = {};
+  availableLaps = [];
+
+  if (!rows || rows.length === 0) {
+    statusEl.textContent = 'Empty CSV';
+    return;
+  }
+
+  // Normalize headers to lower-case keys are already applied in parseCSV
+  // Group by lap if present
+  const hasLap = rows[0].hasOwnProperty('lap');
+  if (hasLap) {
+    rows.forEach(r => {
+      const lapKey = r.lap;
+      if (!parsedData[lapKey]) parsedData[lapKey] = [];
+      parsedData[lapKey].push(r);
+    });
+  } else {
+    // treat entire file as lap 1
+    parsedData['1'] = rows;
+  }
+
+  availableLaps = Object.keys(parsedData).sort((a,b) => Number(a)-Number(b));
+  // populate selects
+  lapASelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l => `<option value="${l}">Lap ${l}</option>`).join('');
+  lapBSelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l => `<option value="${l}">Lap ${l}</option>`).join('');
+
+  // Pre-resample all laps to common grid
+  // find global max distance
+  let globalMax = 0;
+  availableLaps.forEach(l => {
+    const pts = parsedData[l];
+    pts.forEach(p => {
+      const d = toNumber(p.distance, 0);
+      if (d > globalMax) globalMax = d;
+    });
+  });
+  const step = 0.1;
+  const nsteps = Math.floor(globalMax / step) + 1;
+  grid = Array.from({length: nsteps+1}, (_,i) => +(i*step).toFixed(3));
+  maxDistanceEl.textContent = formatDistance(globalMax);
+
+  availableLaps.forEach(l => {
+    resampled[l] = resampleLap(parsedData[l], step);
+  });
+
+  // default clear selections
+  lapA = null; lapB = null;
+  // Apply initial lap param if present
+  if (initialLapParam) {
+    if (availableLaps.includes(initialLapParam)) {
+      lapASelect.value = initialLapParam;
+      lapA = initialLapParam;
+      setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
+      setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+      statusEl.textContent = `Lap A: ${lapA} selected via URL`;
+    }
+  }
+  // reset heading displays
+  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+  updateChartsForSelection();
+}
+
+//////////////////// UI interactions /////////////////////
+lapASelect.addEventListener('change', () => {
+  const v = lapASelect.value;
+  lapA = v || null;
+  if (lapA && resampled[lapA]) {
+    statusEl.textContent = `Lap A: ${lapA} selected.`;
+  }
+  // set initial heading display for lap A
+  setHeadingForLap(lapA, headingArrowA, headingLabelA, playIndex || 0);
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, playIndex || 0);
+  updateChartsForSelection();
+});
+
+lapBSelect.addEventListener('change', () => {
+  const v = lapBSelect.value;
+  lapB = v || null;
+  if (lapB && resampled[lapB]) {
+    statusEl.textContent = `Lap B: ${lapB} selected.`;
+  }
+  // set initial heading display for lap B
+  setHeadingForLap(lapB, headingArrowB, headingLabelB, playIndex || 0);
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, playIndex || 0);
+  updateChartsForSelection();
+});
+
+selectLapA.addEventListener('click', ()=> lapASelect.focus());
+selectLapB.addEventListener('click', ()=> lapBSelect.focus());
+
+clearSel.addEventListener('click', ()=> {
+  lapASelect.value = ''; lapBSelect.value = '';
+  lapA = null; lapB = null;
+  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
+  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+  updateChartsForSelection();
+  statusEl.textContent = 'Selection cleared.';
+});
+
+playBtn.addEventListener('click', ()=> startPlayback());
+pauseBtn.addEventListener('click', ()=> pausePlayback());
+stopBtn.addEventListener('click', ()=> stopPlayback());
+
+// Back/Close handler: match dashboard behaviour (attempt to close the window)
+const _closeTab = document.getElementById('closeTab');
+if (_closeTab) {
+  _closeTab.addEventListener('click', () => {
+    window.close();
+  });
+  _closeTab.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); window.close();
+    }
+  });
+}
+
+///////////////////// Demo/sample data (optional) /////////////////////
+// If you want quick demo without CSV, uncomment the block below to create dummy laps.
+/*
+(function createDemo(){
+  const demo1 = [];
+  const demo2 = [];
+  for(let i=0;i<=500;i++){
+    const d = +(i*0.1).toFixed(3);
+    demo1.push({distance:d, time:(i*0.02).toFixed(3), speed:(Math.sin(i/50)*20+50).toFixed(2), brake:(i%50<5?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2)});
+    demo2.push({distance:d, time:(i*0.019+0.3).toFixed(3), speed:(Math.sin(i/55)*22+48).toFixed(2), brake:(i%40<4?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2)});
+  }
+  parsedData = {'3': demo1, '5': demo2};
+  onCSVLoaded(Object.values(parsedData).flat());
+})();
+*/
+
+</script>
 </body>
 </html>
