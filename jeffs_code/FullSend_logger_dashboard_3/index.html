@@ -123,12 +123,53 @@
       if(f){ browseBtn.textContent = f.name; }
       addLog(`Selected file: ${f?f.name:'(none)'}`);
     });
+    
+    openBtn.addEventListener('click', ()=> {
+      const filename = browseBtn.textContent;
+      if(filename === 'Browse'){
+        alert('Please select a file first');
+        addLog('Open failed: no file selected');
+        return;
+      }
+      const ext = filename.split('.').pop().toLowerCase();
+      if(ext === 'csv' || ext === 'xlsx' ){
+        addLog(`Opening file: ${filename}`);
+        // File opening logic here
+      } else {
+        alert(`Warning: "${filename}" is not an accepted format.\nPlease use CSV or Excel files (.csv, .xlsx)`);
+        addLog(`Open failed: invalid format "${ext}"`);
+      }
     });
-    openBtn.addEventListener('click', ()=> addLog('Open pressed — (demo)'));
-    saveBtn.addEventListener('click', ()=> addLog('Save pressed — (demo)'));
-    cancelBtn.addEventListener('click', ()=> addLog('Cancel pressed'));
+    saveBtn.addEventListener('click', ()=> {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([''], {type: 'text/plain'}));
+      link.download = 'export.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+      addLog('Save dialog opened');
+    });
+    cancelBtn.addEventListener('click', ()=> {
+      browseBtn.textContent = 'Browse';
+      fileInput.value = '';
+      addLog('Cancel pressed — file cleared');
+    });
     radioEnter.addEventListener('click', ()=> addLog('Entered Radio Comm'));
-    dataEnter.addEventListener('click', ()=> addLog('Entered Data View'));
+    dataEnter.addEventListener('click', ()=> {
+      addLog('Entered Data View');
+      // open new tab with dashboard
+      window.open('dashboard.html', '_blank');
+    });
+      document.getElementById('dataModal').style.display='flex';
+    
+      document.getElementById('closeDataModal').addEventListener('click', ()=>{
+      document.getElementById('dataModal').style.display='none';
+    });('click', () => {
+      document.getElementById('dataPage').style.display='none';
+      document.querySelector('.container').style.display='block';
+    });('click', ()=> {
+      addLog('Entered Data View');
+      document.getElementById('dataModal').style.display='flex';
+    });('click', ()=> addLog('Entered Data View'));
 
     function addLog(t){
       const d = document.createElement('div');
@@ -147,5 +188,14 @@
     // preload some demo messages
     ['System ready','Last file loaded: session.csv','Radio: COM3 connected','Data stream: 1.2MB received'].forEach(addLog);
   </script>
+  <!-- Data Subpage Modal -->
+  <div id="dataModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:#1e1e1e;padding:20px;border-radius:16px;width:60%;text-align:center;border:2px solid #999;">
+      <h2>Data Subpage</h2>
+      <p>This is the data page content. Add anything here.</p>
+      <div id="closeDataModal" style="margin-top:20px;background:#ff2e8c;padding:10px 20px;border-radius:10px;cursor:pointer;display:inline-block;">Close</div>
+    </div>
+  </div>
+
 </body>
 </html>

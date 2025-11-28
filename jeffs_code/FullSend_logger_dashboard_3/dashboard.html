@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Race Data Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body{margin:0;background:#0b0b0f;color:white;font-family:Segoe UI,Roboto,sans-serif;padding:20px}
+  .backBtn{width:50px;height:50px;background:#0af;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;user-select:none}
+  .header{display:flex;align-items:center;gap:20px;margin-bottom:20px}
+  .card{background:#111;border:2px solid #444;border-radius:16px;padding:20px;margin:10px}
+  .graph{height:150px;background:#000;border-radius:12px;border:2px solid #333;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="backBtn" id="closeTab">⟵</div>
+  <h2 style="margin:0;background:#0b0b0f;padding:10px 20px;border-radius:10px;border:2px solid #555;">Race Data Dashboard - Borneo Dash Kart Q4 track</h2>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:20px;">
+  <div class="card" style="flex:1;min-width:260px;">
+    <h3>Course / Heading</h3>
+    <div id="headingArrow" style="width:140px;height:140px;border-radius:70px;border:3px solid #777;margin:auto;margin-top:10px;display:flex;align-items:center;justify-content:center;font-size:48px;color:#f44;transition:transform 0.3s ease;">➤</div>
+  </div>
+
+  <div class="card" style="flex:1;min-width:260px;">
+    <h3>Lap Time - BEST TIME: </h3>
+    <div id="lapContainer" style="height:150px;overflow-y:auto;border:2px solid #555;border-radius:8px;padding:8px;">
+      <!-- Lap times will be dynamically populated from CSV data -->
+    </div>
+  </div>
+
+  <div class="card" style="flex:1;min-width:260px;">
+    <h3>Tire temperature & pressure</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="background:#2b2;padding:10px;border-radius:8px;text-align:center;">
+        <div style="font-weight:bold;margin-bottom:5px;">Front Left</div>
+        <div>Temp:<br>PSI:</div>
+      </div>
+      <div style="background:#2b2;padding:10px;border-radius:8px;text-align:center;">
+        <div style="font-weight:bold;margin-bottom:5px;">Front Right</div>
+        <div>Temp:<br>PSI:</div>
+      </div>
+      <div style="background:#e92;padding:10px;border-radius:8px;text-align:center;">
+        <div style="font-weight:bold;margin-bottom:5px;">Rear Left</div>
+        <div>Temp:<br>PSI:</div>
+      </div>
+      <div style="background:#d22;padding:10px;border-radius:8px;text-align:center;">
+        <div style="font-weight:bold;margin-bottom:5px;">Rear Right</div>
+        <div>Temp:<br>PSI:</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>Lap time over Laps</h3>
+<div class="graph" id="lapTimeChartContainer" style="position:relative;height:300px;cursor:pointer;" title="Double-click to expand">
+  <canvas id="lapTimeChart"></canvas>
+</div>
+
+<h3>Time vs Distance</h3>
+<div class="graph" id="timeDistanceChart" style="cursor:pointer;" title="Double-click to expand">Graph</div>
+
+<h3>Brake vs Distance</h3>
+<div class="graph" id="brakeDistanceChart" style="cursor:pointer;" title="Double-click to expand">Graph</div>
+
+<h3>Gas vs Distance</h3>
+<div class="graph" id="gasDistanceChart" style="cursor:pointer;" title="Double-click to expand">Graph</div>
+
+<h3>Speed vs Distance</h3>
+<div class="graph" id="speedDistanceChart" style="cursor:pointer;" title="Double-click to expand">Graph</div>
+
+<script>
+  const headingArrow = document.getElementById('headingArrow');
+  const lapContainer = document.getElementById('lapContainer');
+  const lapHeading = document.querySelector('.card:nth-child(2) h3');
+  const lapTimeChartContainer = document.getElementById('lapTimeChartContainer');
+  let lapTimeChart = null;
+  let currentLapTimesData = [];
+  
+  // Function to update arrow rotation based on heading value
+  function updateArrowRotation(heading) {
+    headingArrow.style.transform = `rotate(${heading}deg)`;
+  }
+  
+  // Function to convert time string to milliseconds
+  function timeToMs(timeStr) {
+    // Handle formats like "1:01.364" or "1.01.364"
+    let parts = timeStr.match(/(\d+):(\d+)\.(\d+)/); // MM:SS.ms format
+    
+    if (!parts) {
+      // Try alternative format with dot instead of colon
+      parts = timeStr.match(/(\d+)\.(\d+)\.(\d+)/); // M.SS.ms format
+      if (!parts) return Infinity;
+      
+      const minutes = parseInt(parts[1]);
+      const seconds = parseInt(parts[2]);
+      const ms = parseInt(parts[3]);
+      return minutes * 60000 + seconds * 1000 + ms;
+    }
+    
+    const minutes = parseInt(parts[1]);
+    const seconds = parseInt(parts[2]);
+    const ms = parseInt(parts[3]);
+    return minutes * 60000 + seconds * 1000 + ms;
+  }
+  
+  // Function to find the best (fastest) lap time
+  function findBestLapTime(lapTimesData) {
+    if (!lapTimesData || lapTimesData.length === 0) return null;
+    
+    let bestTime = lapTimesData[0];
+    let bestTimeMs = timeToMs(bestTime);
+    
+    lapTimesData.forEach(time => {
+      const timeMs = timeToMs(time);
+      if (timeMs < bestTimeMs) {
+        bestTimeMs = timeMs;
+        bestTime = time;
+      }
+    });
+    
+    return bestTime;
+  }
+  
+  // Function to get color based on time difference from best lap
+  function getColorByDifference(lapTimeMs, bestTimeMs) {
+    const difference = (lapTimeMs - bestTimeMs) / 1000; // Convert to seconds
+    
+    if (difference <= 0) {
+      return '#9933FF'; // Purple - best lap
+    } else if (difference < 0.100) {
+      return '#00FF00'; // Green - within 0.100s
+    } else if (difference < 0.300) {
+      return '#FFFF33'; // Yellow - within 0.300s
+    } else if (difference < 0.500) {
+      return '#FF9933'; // Orange - within 0.500s
+    } else {
+      return '#CC0000'; // Red - slower than 0.500s
+    }
+  }
+  
+  // Function to populate lap times from CSV data
+  function populateLapTimes(lapTimesData) {
+    lapContainer.innerHTML = ''; // Clear existing lap times
+    currentLapTimesData = lapTimesData; // Store for chart expansion
+    
+    if (!lapTimesData || lapTimesData.length === 0) {
+      lapContainer.innerHTML = '<div style="padding:8px;text-align:center;">No lap data available</div>';
+      lapHeading.textContent = 'Lap Time - BEST TIME: N/A';
+      return;
+    }
+    
+    // Find and display best time
+    const bestTime = findBestLapTime(lapTimesData);
+    const bestTimeMs = timeToMs(bestTime);
+    lapHeading.textContent = `Lap Time - BEST TIME: ${bestTime}`;
+    
+    // lapTimesData should be an array like ['1.01.364s', '1.02.150s', '1.00.987s']
+    lapTimesData.forEach((lapTime, index) => {
+      const lapNumber = lapTimesData.length - index; // Display in reverse order
+      const lapTimeMs = timeToMs(lapTime);
+      const difference = ((lapTimeMs - bestTimeMs) / 1000).toFixed(3);
+      
+      const lapDiv = document.createElement('div');
+      lapDiv.className = 'lapTime';
+      lapDiv.textContent = `Lap ${lapNumber}: ${lapTime} (${difference > 0 ? '+' : ''}${difference}s)`;
+      
+      const bgColor = getColorByDifference(lapTimeMs, bestTimeMs);
+      lapDiv.style.background = bgColor;
+      lapDiv.style.padding = '8px';
+      lapDiv.style.borderRadius = '6px';
+      lapDiv.style.margin = '6px 0';
+      lapDiv.style.cursor = 'pointer';
+      
+      // Change text color to black for bright backgrounds (green, yellow, orange)
+      if (bgColor === '#00FF00' || bgColor === '#FFFF33' || bgColor === '#FF9933') {
+        lapDiv.style.color = '#000000';
+      }
+      
+      if (lapTime === bestTime) {
+        lapDiv.style.fontWeight = 'bold';
+      }
+      
+      lapDiv.addEventListener('click', () => {
+        // Store lap data in localStorage
+        localStorage.setItem(`lap_${lapNumber}_time`, lapTime);
+        localStorage.setItem(`lap_${lapNumber}_difference`, difference);
+        
+        window.open(`lap_analysis.html?lap=${lapNumber}`, '_blank');
+      });
+      
+      lapContainer.appendChild(lapDiv);
+    });
+    
+    // Update the bar chart
+    updateLapTimeChart(lapTimesData);
+  }
+  
+  // Function to update lap time chart
+  function updateLapTimeChart(lapTimesData) {
+    if (!lapTimesData || lapTimesData.length === 0) return;
+    
+    const ctx = document.getElementById('lapTimeChart').getContext('2d');
+    const bestTimeMs = timeToMs(findBestLapTime(lapTimesData));
+    
+    // Prepare chart data
+    const labels = lapTimesData.map((_, index) => `Lap ${index + 1}`);
+    const data = lapTimesData.map(time => {
+      const timeMs = timeToMs(time);
+      return (timeMs / 1000).toFixed(3); // Convert to seconds
+    });
+    
+    // Get colors for each bar
+    const backgroundColor = lapTimesData.map(time => {
+      const timeMs = timeToMs(time);
+      return getColorByDifference(timeMs, bestTimeMs);
+    });
+    
+    // Destroy existing chart if it exists
+    if (lapTimeChart) {
+      lapTimeChart.destroy();
+    }
+    
+    // Create new chart
+    lapTimeChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Lap Time (seconds)',
+          data: data,
+          backgroundColor: backgroundColor,
+          borderColor: '#fff',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: {
+              color: '#fff'
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Time (seconds)',
+              color: '#fff'
+            },
+            ticks: {
+              color: '#fff'
+            },
+            grid: {
+              color: '#444'
+            }
+          },
+          x: {
+            ticks: {
+              color: '#fff',
+              callback: function(value, index) {
+                return labels[index];
+              }
+            },
+            grid: {
+              color: '#444'
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // Example usage: when CSV data is received from index.html
+  // populateLapTimes(['1.01.364s', '1.02.150s', '1.00.987s']);
+  
+  document.getElementById('closeTab').addEventListener('click', () => {
+    window.close();
+  });
+  
+  // Double-click handler for lap time chart
+  lapTimeChartContainer.addEventListener('dblclick', () => {
+    // Store lap data in sessionStorage to pass to new window
+    sessionStorage.setItem('lapTimesData', JSON.stringify(currentLapTimesData));
+    
+    // Create a new window with expanded chart
+    const newWindow = window.open('', 'lapTimeChart', 'width=1200,height=700');
+    const lapData = JSON.stringify(currentLapTimesData);
+    
+    const expandedChartHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Lap Time Over Laps - Expanded</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+  <style>
+    body{margin:0;background:#ffffff;color:#000;font-family:Segoe UI,Roboto,sans-serif;padding:20px}
+    .container{max-width:1200px;margin:0 auto;}
+    h1{text-align:center;color:#000;}
+    #expandedChart{position:relative;height:600px;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lap Time Over Laps</h1>
+    <div id="expandedChart">
+      <canvas id="chartCanvas"><\/canvas>
+    </div>
+  </div>
+  <script>
+    const lapTimesData = ${lapData};
+    
+    function timeToMs(timeStr) {
+      let parts = timeStr.match(/(\\d+):(\\d+)\\.(\\d+)/);
+      if (!parts) {
+        parts = timeStr.match(/(\\d+)\\.(\\d+)\\.(\\d+)/);
+        if (!parts) return Infinity;
+        const minutes = parseInt(parts[1]);
+        const seconds = parseInt(parts[2]);
+        const ms = parseInt(parts[3]);
+        return minutes * 60000 + seconds * 1000 + ms;
+      }
+      const minutes = parseInt(parts[1]);
+      const seconds = parseInt(parts[2]);
+      const ms = parseInt(parts[3]);
+      return minutes * 60000 + seconds * 1000 + ms;
+    }
+    
+    function getColorByDifference(lapTimeMs, bestTimeMs) {
+      const difference = (lapTimeMs - bestTimeMs) / 1000;
+      if (difference <= 0) {
+        return '#9933FF';
+      } else if (difference < 0.100) {
+        return '#00FF00';
+      } else if (difference < 0.300) {
+        return '#FFFF33';
+      } else if (difference < 0.500) {
+        return '#FF9933';
+      } else {
+        return '#CC0000';
+      }
+    }
+    
+    let bestTimeMs = Math.min(...lapTimesData.map(t => timeToMs(t)));
+    const labels = lapTimesData.map((_, i) => 'Lap ' + (i + 1));
+    const data = lapTimesData.map(t => (timeToMs(t) / 1000).toFixed(3));
+    const backgroundColor = lapTimesData.map(t => getColorByDifference(timeToMs(t), bestTimeMs));
+    
+    const ctx = document.getElementById('chartCanvas').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Lap Time (seconds)',
+          data: data,
+          backgroundColor: backgroundColor,
+          borderColor: '#fff',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {labels: {color: '#000'}}
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {color: '#000'},
+            grid: {color: '#ddd'}
+          },
+          x: {
+            ticks: {color: '#000'},
+            grid: {color: '#ddd'}
+          }
+        }
+      }
+    });
+  <\/script>
+</body>
+</html>`;
+    
+    newWindow.document.write(expandedChartHTML);
+    newWindow.document.close();
+  });
+  
+  // Function to open expanded graph in new window
+  function openExpandedGraph(title, graphId) {
+    const expandedHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title} - Expanded</title>
+  <style>
+    body{margin:0;background:#ffffff;color:#000;font-family:Segoe UI,Roboto,sans-serif;padding:20px}
+    .container{max-width:1200px;margin:0 auto;text-align:center;}
+    h1{text-align:center;color:#000;}
+    #graphArea{position:relative;height:600px;background:#f0f0f0;border-radius:12px;border:2px solid #333;display:flex;align-items:center;justify-content:center;font-size:24px;color:#666;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${title}</h1>
+    <div id="graphArea">Graph Placeholder - ${title}</div>
+  </div>
+</body>
+</html>`;
+    
+    const newWindow = window.open('', title, 'width=1200,height=700');
+    newWindow.document.write(expandedHTML);
+    newWindow.document.close();
+  }
+  
+  // Add double-click handlers to all graphs
+  document.getElementById('timeDistanceChart').addEventListener('dblclick', () => {
+    openExpandedGraph('Time vs Distance', 'timeDistanceChart');
+  });
+  
+  document.getElementById('brakeDistanceChart').addEventListener('dblclick', () => {
+    openExpandedGraph('Brake vs Distance', 'brakeDistanceChart');
+  });
+  
+  document.getElementById('gasDistanceChart').addEventListener('dblclick', () => {
+    openExpandedGraph('Gas vs Distance', 'gasDistanceChart');
+  });
+  
+  document.getElementById('speedDistanceChart').addEventListener('dblclick', () => {
+    openExpandedGraph('Speed vs Distance', 'speedDistanceChart');
+  });
+  
+  // Listen for messages from the parent window (index.html)
+  window.addEventListener('message', (event) => {
+    if (event.data.type === 'CSV_DATA') {
+      const csvData = event.data.data;
+      
+      // Extract lap times from CSV
+      // Assuming CSV has columns like: lapNumber, lapTime
+      // Adjust based on your actual CSV structure
+      const lapTimes = csvData.map(row => row.lapTime || row.time || '0:00.000s');
+      
+      if (event.data.heading !== undefined) {
+        updateArrowRotation(event.data.heading);
+      }
+      
+      populateLapTimes(lapTimes);
+    }
+  });
+  
+  // Placeholder: when you have CSV data, call populateLapTimes with the lap times array
+  // For demonstration, let's show some sample data
+  populateLapTimes(['1.01.364s', '1.02.150s', '1.00.987s']);
+  updateArrowRotation(0);
+</script>
+
+</body>
+</html>
