@@ -135,6 +135,79 @@
 
 </div>
 
+<!-- G-Force Panel -->
+<div class="panel" style="margin-top:12px;">
+  <h3 class="panel-title">G-Force Meter</h3>
+
+  <div style="
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      gap:28px;
+      padding:10px 0;
+  ">
+
+    <!-- G-ball -->
+    <div style="
+        width:200px;
+        height:200px;
+        background:#000;
+        border-radius:50%;
+        border:2px solid #444;
+        position:relative;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-shrink:0;
+    ">
+
+      <!-- moving dot -->
+      <div id="gBall" style="
+        width:22px;
+        height:22px;
+        background:#3a86ff;
+        border-radius:50%;
+        position:absolute;
+        left:89px;
+        top:89px;
+        transition:0.10s linear;
+      "></div>
+
+      <!-- axis lines -->
+      <div style="position:absolute; left:50%; top:0; width:2px; height:100%; background:#222;"></div>
+      <div style="position:absolute; top:50%; left:0; width:100%; height:2px; background:#222;"></div>
+    </div>
+
+    <!-- Digital G values -->
+    <div style="
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        min-width:140px;
+        flex-shrink:0;
+    ">
+      <div class="small">Longitudinal G</div>
+      <div id="longG" class="meter" style="width:110px;">0.00g</div>
+
+      <div class="small">Lateral G</div>
+      <div id="latG" class="meter" style="width:110px;">0.00g</div>
+
+      <div class="small">Combined G</div>
+      <div id="combG" class="meter" style="width:110px;">0.00g</div>
+    </div>
+
+    <!-- G-Force Line Chart -->
+    <div style="flex:1;">
+      <h4 style="margin:0 0 6px 0;">G-Force vs Distance</h4>
+      <div class="chartWrap" style="height:220px;">
+        <canvas id="gChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
 <!-- Sector Time Panel -->
 <div class="panel" style="margin-top:12px; display:flex; gap:12px; justify-content:space-between;">
 
@@ -163,6 +236,7 @@
   </div>
 
 </div>
+
 
 <!-- charts grid -->
 <div style="display:flex; flex-direction:column; gap:12px; margin-top:12px">
@@ -706,9 +780,18 @@ function stepPlayback() {
       currentPointB = project(Number(la), Number(lo));
     }
   }
+
+  // Highlight playback position on G Chart
+  if (gChart) {
+    gChart.setActiveElements([{datasetIndex:0, index:playIndex}]);
+    gChart.update();
+  }
+
   // Draw
   drawMap();
   playIndex++;
+  computeGforces(playIndex);
+
 }
 function pausePlayback() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; statusEl.textContent = 'Paused'; }
@@ -723,6 +806,128 @@ function stopPlayback() {
   currentPointA = currentPointB = null;
   drawMap();
 }
+
+
+/* G meter */
+function computeGforces(idx) {
+    if (!lapA && !lapB) return;
+
+    let gx = 0, gy = 0;
+
+    // Prefer Lap A for playback G-meter
+    const lap = lapA || lapB;
+    if (!lap || !resampled[lap]) return;
+
+    const r = resampled[lap];
+
+    // Detect G columns
+    const ax = r.ax || r.accel_x || r.gx || r.long || r.long_g || null;
+    const ay = r.ay || r.accel_y || r.gy || r.lat || r.lat_g || null;
+
+    if (!ax || !ay) return;
+
+    gx = Number(ax[idx]);
+    gy = Number(ay[idx]);
+
+    // Update numeric
+    document.getElementById("longG").textContent = gx.toFixed(2) + "g";
+    document.getElementById("latG").textContent = gy.toFixed(2) + "g";
+
+    const combined = Math.sqrt(gx*gx + gy*gy);
+    document.getElementById("combG").textContent = combined.toFixed(2) + "g";
+
+    // Update G-ball position
+    updateGBall(gx, gy);
+}
+
+function updateGBall(gx, gy) {
+    const ball = document.getElementById("gBall");
+    const maxG = 2.0;     // adjust to track limits
+    const radius = 75;    // px usable radius inside circle
+
+    let x = (gx / maxG) * radius;
+    let y = (gy / maxG) * radius;
+
+    // clamp
+    x = Math.max(-radius, Math.min(radius, x));
+    y = Math.max(-radius, Math.min(radius, -y)); // invert Y axis
+
+    ball.style.left = (80 + x) + "px";
+    ball.style.top  = (80 + y) + "px";
+}
+
+const ctxG = document.getElementById('gChart').getContext('2d');
+
+const gChart = new Chart(ctxG, {
+  type: 'line',
+  data: {
+    labels: [],     // distance
+    datasets: [
+      {
+        label: 'Longitudinal G',
+        data: [],
+        borderColor: '#3a86ff',
+        borderWidth: 1.6,
+        pointRadius: 0
+      },
+      {
+        label: 'Lateral G',
+        data: [],
+        borderColor: '#ffb703',
+        borderWidth: 1.6,
+        pointRadius: 0
+      },
+      {
+        label: 'Combined G',
+        data: [],
+        borderColor: '#d7263d',
+        borderWidth: 1.6,
+        pointRadius: 0
+      }
+    ]
+  },
+  options:{
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{
+      legend:{
+        display:true,
+        position:'top',
+        labels:{ color:'#fff' }
+      }
+    },
+    scales:{
+      x:{ticks:{color:'#ddd'}, grid:{color:'#222'}},
+      y:{ticks:{color:'#ddd'}, grid:{color:'#222'}}
+    }
+  }
+});
+
+function updateGforceChart() {
+  const lap = lapA || lapB;
+  if (!lap || !resampled[lap]) return;
+
+  const r = resampled[lap];
+  const dist = r.dist;
+
+  // detect columns
+  const ax = r.ax || r.accel_x || r.gx || r.long || r.long_g;
+  const ay = r.ay || r.accel_y || r.gy || r.lat || r.lat_g;
+
+  if (!ax || !ay) return;
+
+  const combined = ax.map((v,i)=> Math.sqrt(v*v + ay[i]*ay[i]));
+
+  gChart.data.labels = dist.map(d => d.toFixed(1));
+  gChart.data.datasets[0].data = ax;
+  gChart.data.datasets[1].data = ay;
+  gChart.data.datasets[2].data = combined;
+
+  gChart.update();
+}
+
+
+
 
 /* -------------------------------
    Map drawing & projection
@@ -906,6 +1111,7 @@ lapASelect.addEventListener('change', ()=>{
   prepareMapPaths();
   updateChartsForSelection();
   setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+  updateGforceChart();
   updateSectorPanel();
 });
 lapBSelect.addEventListener('change', ()=>{
@@ -915,6 +1121,7 @@ lapBSelect.addEventListener('change', ()=>{
   prepareMapPaths();
   updateChartsForSelection();
   setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+  updateGforceChart();
   updateSectorPanel();
 });
 selectLapA.addEventListener('click', ()=> lapASelect.focus());
@@ -926,6 +1133,10 @@ clearSel.addEventListener('click', ()=>{
   mapA=[]; mapB=[];
   updateChartsForSelection();
   drawMap();
+  gChart.data.labels = [];
+  gChart.data.datasets.forEach(ds => ds.data = []);
+  gChart.update();
+
   updateSectorPanel();
   statusEl.textContent = 'Selection cleared.';
 });
