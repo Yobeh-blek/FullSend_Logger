@@ -261,6 +261,33 @@
   </div>
 </div>
 
+<!-- Note Taking Panel -->
+<div class="panel" style="margin-top:12px;">
+  <h3 class="panel-title">Notes</h3>
+
+  <textarea id="noteArea" 
+    placeholder="Write your notes here..."
+    style="
+      width:100%; 
+      height:150px; 
+      background:#0b0b0f;
+      color:#fff;
+      border:1px solid #333;
+      border-radius:8px;
+      padding:10px;
+      resize:vertical;
+      font-size:14px;
+    ">
+  </textarea>
+
+  <div style="margin-top:10px; display:flex; gap:10px;">
+    <button id="saveNoteBtn" class="btn primary">Save Notes</button>
+    <button id="clearNoteBtn" class="btn">Clear</button>
+  </div>
+</div>
+
+
+
 <script>
 /* -------------------------------
    Globals & DOM references
@@ -373,13 +400,11 @@ function updateSectorPanel() {
 }
 
 
-
-
 let mapA = [], mapB = []; // normalized projected arrays: [{x,y},...]
 let currentPointA = null, currentPointB = null;
 
 /* -------------------------------
-   Chart setup
+   Time, Speed, Gas and Brake Chart setup
    ------------------------------- */
 function buildChart(ctx) {
   return new Chart(ctx, {
@@ -402,8 +427,6 @@ function buildChart(ctx) {
     }
   });
 }
-
-
 
 const chartTime = buildChart(document.getElementById('chartTime').getContext('2d'));
 const chartSpeed = buildChart(document.getElementById('chartSpeed').getContext('2d'));
@@ -646,6 +669,36 @@ function onFileRowsLoaded(rows) {
   // draw empty map
   drawMap();
 }
+
+/* -------------------------------
+  Save notes to a text file
+  ------------------------------- */
+document.getElementById("saveNoteBtn").addEventListener("click", () => {
+  const text = document.getElementById("noteArea").value;
+
+  if (!text.trim()) {
+    alert("No notes to save!");
+    return;
+  }
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lap_notes.txt";    // filename
+  a.click();
+
+  URL.revokeObjectURL(url);
+});
+
+// Clear note area
+document.getElementById("clearNoteBtn").addEventListener("click", () => {
+  if (confirm("Clear all notes?")) {
+    document.getElementById("noteArea").value = "";
+  }
+});
+
 
 /* -------------------------------
    Update charts
