@@ -4,7 +4,11 @@
 <meta charset="utf-8" />
 <title>Lap Analysis — Compare Laps (0.1m resample)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.sheetjs.com/xlsx-0.19.1/package/dist/xlsx.full.min.js"></script>
+
 <style>
   :root{
     --bg:#0b0b0f; --panel:#111; --accent:#ffb86b; --muted:#444; --text:#fff;
@@ -14,9 +18,9 @@
   .btn{background:var(--muted);color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;border:0}
   .btn.primary{background:#3a86ff}
   .panel{background:var(--panel);padding:12px;border-radius:10px;border:1px solid #2a2a2a}
-  .headingBox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:68px}
-  .headingArrow{width:48px;height:48px;border-radius:24px;border:3px solid #777;display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform 0.3s ease}
-  .headingText{font-size:13px;color:#ddd}
+  .headingBox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:140px}
+  .headingArrow{width:96px;height:96px;border-radius:48px;border:6px solid #777;display:flex;align-items:center;justify-content:center;font-size:48px;transition:transform 0.25s ease}
+  .headingText{font-size:16px;color:#ddd}
   .playbackInfo{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   .playbackInfo .small{margin:0}
   .header{display:flex;gap:12px;align-items:center;margin-bottom:12px}
@@ -34,6 +38,30 @@
   .meter{font-family:monospace;background:#0b0b0f;padding:6px 8px;border-radius:6px;border:1px solid #333}
   .stat{display:flex;flex-direction:column;align-items:center;min-width:80px;gap:3px}
   .stat .small{font-size:12px;color:#aaa;margin:0}
+  /* 3-panel row adjustments */
+  .top-row { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
+  .file-panel { flex:0.7; min-width:180px; }
+  .heading-panel { flex:1.4; }
+  .map-panel { flex:1.4; }
+  /* Map canvas responsive */
+  #gpsMap { width:100%; height:220px; background:#000; border-radius:10px; display:block; }
+  /* make chart containers responsive */
+  .panel .panel-title { margin:0 0 10px 0; font-size:16px; }
+  /* small tweaks for mobile */
+  @media (max-width:1000px){
+    .top-row { flex-direction:column; }
+    .file-panel, .heading-panel, .map-panel { flex:unset; width:100%; }
+    #gpsMap{ height:300px; }
+  }
+
+  .top-row > .panel { display: flex; flex-direction: column; height: 100%; }
+
+  .top-row { align-items: stretch;/* makes all children same height */ }
+
+  .map-panel { display: flex; flex-direction: column;}
+
+  #gpsMap { flex: 1;/* canvas grows to fill height */ min-height: 220px;/* keep your original size */ }
+
 </style>
 </head>
 <body>
@@ -43,30 +71,46 @@
   <h2 style="margin:0;background:#0b0b0f;padding:10px 20px;border-radius:10px;border:2px solid #555;">Lap Analysis</h2>
 </div>
 
-  <div class="panel controls">
-    <button id="selectLapA" class="btn">Select Lap A</button>
-    <select id="lapASelect" class="select-lap"></select>
-    <button id="selectLapB" class="btn">Select Lap B</button>
-    <select id="lapBSelect" class="select-lap"></select>
-    <button id="clearSel" class="btn">Clear</button>
+<!-- top controls row -->
+<div class="panel controls" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+  <label class="fileBtn btn" for="fileInput">Load CSV / XLSX</label>
+  <input id="fileInput" type="file" accept=".csv,.xls,.xlsx" />
+  <button id="selectLapA" class="btn">Select Lap A</button>
+  <select id="lapASelect" class="select-lap"></select>
+  <button id="selectLapB" class="btn">Select Lap B</button>
+  <select id="lapBSelect" class="select-lap"></select>
+  <button id="clearSel" class="btn">Clear</button>
+
+  <div style="margin-left:auto" class="playback" role="group" aria-label="Playback controls">
+    <button id="playBtn" class="btn primary">Play</button>
+    <button id="pauseBtn" class="btn">Pause</button>
+    <button id="stopBtn" class="btn">Stop</button>
+    <div style="display:flex;flex-direction:column;margin-left:10px">
+      <label class="small">Interval(ms per 0.1m)</label>
+      <input id="intervalInput" type="number" value="50" min="10" style="width:90px;padding:6px;border-radius:6px;border:1px solid #333;background:#0b0b0f;color:#fff">
+    </div>
+  </div>
+</div>
+
+<!-- three panels: File Info | Headings | GPS Map -->
+<div class="top-row" style="display:flex; gap:12px; margin-bottom:12px; align-items:stretch;">
+
+  <!-- File panel -->
+  <div class="panel map-panel" style="flex:0.6; height:320px;">
+    <h3 class="panel-title">File Info</h3>
+    <div style="margin-bottom:8px"><strong>File:</strong> <span id="fileName" class="small">(none)</span></div>
+    <div class="small">Legend: <span style="color:#ffd54a">Lap A</span> vs <span style="color:#9b59b6">Lap B</span></div>
+    <div id="status" class="status">No file loaded.</div>
+    <div style="margin-top:10px">
+      <div class="small">Detected columns: <span id="detectedCols" class="small">(none)</span></div>
+    </div>
   </div>
 
-  <div style="margin-left:auto" class="panel controls playbackPanel">
-    <div class="playback" role="group" aria-label="Playback controls">
-      <button id="playBtn" class="btn primary">Play</button>
-      <button id="pauseBtn" class="btn">Pause</button>
-      <button id="stopBtn" class="btn">Stop</button>
-      <div style="display:flex;flex-direction:column;margin-left:10px">
-        <label class="small">Interval(ms per 0.1m)</label>
-        <input id="intervalInput" type="number" value="50" min="10" style="width:90px;padding:6px;border-radius:6px;border:1px solid #333;background:#0b0b0f;color:#fff">
-      </div>
-    </div>
-    <div class="playbackInfo" aria-live="polite" role="status">
-      <div class="stat"><div class="small">Distance</div><div id="currentDistance" class="meter">0.0m</div></div>
-      <div class="stat"><div class="small">Step</div><div id="currentStep" class="meter">0</div></div>
-      <div class="stat"><div class="small">Max</div><div id="maxDistance" class="meter">0.0m</div></div>
-      <!-- small headings duplicates for quick glance -->
-      <div class="headingBox" style="margin-left:12px">
+  <!-- Heading panel -->
+  <div class="panel map-panel" style="flex:1.4; height:320px;">
+    <h3 class="panel-title">Headings</h3>
+    <div style="display:flex; gap:300px; align-items:center; margin-top:auto; margin-bottom:auto;">
+      <div class="headingBox">
         <div class="small">Lap A</div>
         <div class="headingArrow" id="headingArrowA_small" style="border-color:#ffd54a;color:#ffd54a">➤</div>
         <div id="headingLabelA_small" class="headingText">N/A</div>
@@ -78,70 +122,84 @@
       </div>
     </div>
   </div>
-</div>
 
-<div style="display:flex;gap:12px;margin-bottom:12px">
-  <div class="col panel">
-    <div style="margin-bottom:8px"><strong>File:</strong> <span id="fileName" class="small">(none)</span></div>
-    <div class="small">Legend: <span style="color:#ffd54a">Lap A</span> vs <span style="color:#9b59b6">Lap B</span></div>
-    <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
-      <div class="headingBox">
-        <div class="small">Lap A</div>
-        <div class="headingArrow" id="headingArrowA" style="border-color:#ffd54a;color:#ffd54a">➤</div>
-        <div id="headingLabelA" class="headingText">N/A</div>
-      </div>
-      <div class="headingBox">
-        <div class="small">Lap B</div>
-        <div class="headingArrow" id="headingArrowB" style="border-color:#9b59b6;color:#9b59b6">➤</div>
-        <div id="headingLabelB" class="headingText">N/A</div>
-      </div>
+  <!-- GPS map panel -->
+  <div class="panel map-panel" style="flex:1.4; height:320px;">
+    <h3 class="panel-title">GPS Map</h3>
+    <canvas id="gpsMap"></canvas>
+    <div style="display:flex;gap:10px;margin-top:8px;align-items:center;">
+      <div class="small">Zoom, Pan (left-drag), Rotate (right-drag)</div>
+      <button id="resetView" class="btn" style="margin-left:auto">Reset View</button>
     </div>
-    <div class="status" id="status">No file loaded.</div>
   </div>
 
-  <!-- Playback column removed, controls & info merged into the top-right panel -->
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<!-- Sector Time Panel -->
+<div class="panel" style="margin-top:12px; display:flex; gap:12px; justify-content:space-between;">
+
+  <!-- Sector 1 -->
+  <div style="flex:1; background:#0d0d0f; padding:12px; border-radius:10px; border:1px solid #333;">
+    <h4 style="margin:0 0 10px 0; color:#fff;">Sector 1</h4>
+    <div class="small">Best: <span id="bestS1">(N/A)</span></div>
+    <div class="small">Lap A: <span id="lapAS1">(N/A)</span></div>
+    <div class="small">Lap B: <span id="lapBS1">(N/A)</span></div>
+  </div>
+
+  <!-- Sector 2 -->
+  <div style="flex:1; background:#0d0d0f; padding:12px; border-radius:10px; border:1px solid #333;">
+    <h4 style="margin:0 0 10px 0; color:#fff;">Sector 2</h4>
+    <div class="small">Best: <span id="bestS2">(N/A)</span></div>
+    <div class="small">Lap A: <span id="lapAS2">(N/A)</span></div>
+    <div class="small">Lap B: <span id="lapBS2">(N/A)</span></div>
+  </div>
+
+  <!-- Sector 3 -->
+  <div style="flex:1; background:#0d0d0f; padding:12px; border-radius:10px; border:1px solid #333;">
+    <h4 style="margin:0 0 10px 0; color:#fff;">Sector 3</h4>
+    <div class="small">Best: <span id="bestS3">(N/A)</span></div>
+    <div class="small">Lap A: <span id="lapAS3">(N/A)</span></div>
+    <div class="small">Lap B: <span id="lapBS3">(N/A)</span></div>
+  </div>
+
+</div>
+
+<!-- charts grid -->
+<div style="display:flex; flex-direction:column; gap:12px; margin-top:12px">
   <div class="panel">
-    <div style="margin-bottom:8px"><strong>Time vs Distance</strong></div>
+    <div class="panel-title">Time vs Distance</div>
     <div class="chartWrap"><canvas id="chartTime"></canvas></div>
   </div>
 
   <div class="panel">
-    <div style="margin-bottom:8px"><strong>Speed vs Distance</strong></div>
+    <div class="panel-title">Speed vs Distance</div>
     <div class="chartWrap"><canvas id="chartSpeed"></canvas></div>
   </div>
 
   <div class="panel">
-    <div style="margin-bottom:8px"><strong>Brake vs Distance</strong></div>
+    <div class="panel-title">Brake vs Distance</div>
     <div class="chartWrap"><canvas id="chartBrake"></canvas></div>
   </div>
 
   <div class="panel">
-    <div style="margin-bottom:8px"><strong>Gas vs Distance</strong></div>
+    <div class="panel-title">Gas vs Distance</div>
     <div class="chartWrap"><canvas id="chartGas"></canvas></div>
   </div>
 </div>
 
 <script>
-/*
-Assumptions about CSV:
-- CSV contains header row.
-- Expected columns (if present): lap, distance, time, speed, brake, gas, heading, wheel_fl, wheel_fr, wheel_rl, wheel_rr, steering
-- If 'lap' column missing -> whole file treated as lap 1
-- Distance unit assumed meters
-- Time assumed in seconds (or format like mm:ss.mmm will be attempted to parse)
-*/
-
+/* -------------------------------
+   Globals & DOM references
+   ------------------------------- */
 const fileInput = document.getElementById('fileInput');
 const fileNameSpan = document.getElementById('fileName');
 const statusEl = document.getElementById('status');
+const detectedColsEl = document.getElementById('detectedCols');
 
-const selectLapA = document.getElementById('selectLapA');
-const selectLapB = document.getElementById('selectLapB');
 const lapASelect = document.getElementById('lapASelect');
 const lapBSelect = document.getElementById('lapBSelect');
+const selectLapA = document.getElementById('selectLapA');
+const selectLapB = document.getElementById('selectLapB');
 const clearSel = document.getElementById('clearSel');
 
 const playBtn = document.getElementById('playBtn');
@@ -150,118 +208,247 @@ const stopBtn = document.getElementById('stopBtn');
 const intervalInput = document.getElementById('intervalInput');
 
 const currentDistanceEl = document.getElementById('currentDistance');
-const currentStepEl = document.getElementById('currentStep');
-const maxDistanceEl = document.getElementById('maxDistance');
-const headingArrowA = document.getElementById('headingArrowA');
-const headingLabelA = document.getElementById('headingLabelA');
-const headingArrowB = document.getElementById('headingArrowB');
-const headingLabelB = document.getElementById('headingLabelB');
-// small heading duplicates shown in the merged playback panel
 const headingArrowA_small = document.getElementById('headingArrowA_small');
 const headingLabelA_small = document.getElementById('headingLabelA_small');
 const headingArrowB_small = document.getElementById('headingArrowB_small');
 const headingLabelB_small = document.getElementById('headingLabelB_small');
 
-let parsedData = {}; // { lapNumber: [{distance:..., time:..., speed:..., ...}, ...] }
+const gpsCanvas = document.getElementById('gpsMap');
+const gpsCtx = gpsCanvas.getContext('2d');
+const resetViewBtn = document.getElementById('resetView');
+
+let parsedData = {}; // { lapKey: [rows...] }
 let availableLaps = [];
-let resampled = {};  // { lapNumber: {dist:[], time:[], speed:[], brake:[], gas:[]} }
-let grid = []; // 0..max step 0.1
+let resampled = {};  // { lapKey: {dist:[], time:[], speed:[], brake:[], gas:[], heading:[], lat:[], lon:[]} }
+let grid = []; // distances 0..max step 0.1
 let lapA = null, lapB = null;
 
 let playTimer = null;
 let playIndex = 0;
-// If the page is opened with ?lap=123, capture it and preselect later after CSV loaded
-const initialLapParam = (new URLSearchParams(window.location.search)).get('lap');
 
-/////////////////////// Simple CSV parser ///////////////////////
-function parseCSV(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-  if (lines.length === 0) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    if (cols.length === 1 && cols[0].trim() === '') continue;
-    const obj = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = (cols[j] !== undefined) ? cols[j].trim() : '';
+let detectedColumns = []; // list of column names from file
+
+// Map state
+const mapState = {
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  rotation: 0,
+  isPanning: false,
+  isRotating: false,
+  lastX: 0,
+  lastY: 0
+};
+
+function computeSectorTimes(lapKey) {
+  if (!lapKey || !resampled[lapKey] || !resampled[lapKey].time) return null;
+
+  const r = resampled[lapKey];
+  const dist = r.dist;
+  const time = r.time;
+
+  if (!dist.length || !time.length) return null;
+
+  const maxD = dist[dist.length - 1];
+  const secLen = maxD / 3;
+
+  // sector boundaries:
+  const s1End = secLen;
+  const s2End = secLen * 2;
+
+  // find indices for sector endpoints
+  const idx1 = dist.findIndex(d => d >= s1End);
+  const idx2 = dist.findIndex(d => d >= s2End);
+
+  const t0 = time[0];
+  const t1 = time[idx1];
+  const t2 = time[idx2];
+  const t3 = time[time.length - 1];
+
+  return {
+    s1: t1 - t0,
+    s2: t2 - t1,
+    s3: t3 - t2
+  };
+}
+
+function updateSectorPanel() {
+  const a = lapA ? computeSectorTimes(lapA) : null;
+  const b = lapB ? computeSectorTimes(lapB) : null;
+
+  // Best = minimum of A and B (if both exist)
+  const best = {
+    s1: (a && b) ? Math.min(a.s1, b.s1) : (a ? a.s1 : (b ? b.s1 : null)),
+    s2: (a && b) ? Math.min(a.s2, b.s2) : (a ? a.s2 : (b ? b.s2 : null)),
+    s3: (a && b) ? Math.min(a.s3, b.s3) : (a ? a.s3 : (b ? b.s3 : null))
+  };
+
+  function fmt(v) { return v ? v.toFixed(3) + "s" : "(N/A)"; }
+
+  document.getElementById("bestS1").textContent = fmt(best.s1);
+  document.getElementById("bestS2").textContent = fmt(best.s2);
+  document.getElementById("bestS3").textContent = fmt(best.s3);
+
+  document.getElementById("lapAS1").textContent = fmt(a?.s1);
+  document.getElementById("lapAS2").textContent = fmt(a?.s2);
+  document.getElementById("lapAS3").textContent = fmt(a?.s3);
+
+  document.getElementById("lapBS1").textContent = fmt(b?.s1);
+  document.getElementById("lapBS2").textContent = fmt(b?.s2);
+  document.getElementById("lapBS3").textContent = fmt(b?.s3);
+}
+
+
+
+
+let mapA = [], mapB = []; // normalized projected arrays: [{x,y},...]
+let currentPointA = null, currentPointB = null;
+
+/* -------------------------------
+   Chart setup
+   ------------------------------- */
+function buildChart(ctx) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+          legend:{
+              display:true,
+              position:'top',      // added line
+              labels:{ color:'#fff', padding:20 }
+          }
+      },
+
+      scales:{
+        x:{ticks:{color:'#ddd'}, grid:{color:'#222'}},
+        y:{ticks:{color:'#ddd'}, grid:{color:'#222'}}
+      }
     }
+  });
+}
+
+
+
+const chartTime = buildChart(document.getElementById('chartTime').getContext('2d'));
+const chartSpeed = buildChart(document.getElementById('chartSpeed').getContext('2d'));
+const chartBrake = buildChart(document.getElementById('chartBrake').getContext('2d'));
+const chartGas = buildChart(document.getElementById('chartGas').getContext('2d'));
+
+/* -------------------------------
+   Utilities: CSV / XLSX parsing
+   ------------------------------- */
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length>0);
+  if (!lines.length) return [];
+  const headers = lines[0].split(',').map(h=>h.trim());
+  const rows = [];
+  for (let i=1;i<lines.length;i++) {
+    const cols = lines[i].split(',');
+    if (cols.length===1 && cols[0].trim()==='') continue;
+    const obj = {};
+    for (let j=0;j<headers.length;j++) obj[headers[j]] = (cols[j]!==undefined)?cols[j].trim():'';
     rows.push(obj);
   }
   return rows;
 }
 
-/////////////////// Helpers /////////////////////
-function toNumber(v, fallback = NaN) {
-  if (v === undefined || v === null || v === '') return fallback;
-  const n = Number(v);
-  if (!isNaN(n)) return n;
-  // try to parse time-like mm:ss.mmm -> convert to seconds
-  const m = String(v).match(/(\d+):(\d+)\.(\d+)/);
-  if (m) {
-    return parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3]) / (m[3].length === 3 ? 1000 : 1);
-  }
-  // fallback remove non-numeric
-  const cleaned = String(v).replace(/[^\d\.\-e]/g,'');
-  return cleaned === '' ? fallback : Number(cleaned);
-}
-
-function getUniqueLaps(rows) {
-  const laps = new Set();
-  rows.forEach(r => {
-    if (r.lap !== undefined) laps.add(r.lap);
-  });
-  return Array.from(laps).sort((a,b) => Number(a)-Number(b));
-}
-
-// Update heading display for a lap at a given index (defaults to 0)
-function setHeadingForLap(lap, arrowEl, labelEl, idx=0) {
-  if (!arrowEl || !labelEl) return;
-  if (!lap || !resampled[lap] || !Array.isArray(resampled[lap].heading)) {
-    labelEl.textContent = 'N/A';
-    arrowEl.style.transform = 'rotate(0deg)';
-    return;
-  }
-  const arr = resampled[lap].heading;
-  const i = Math.min(Math.max(0, idx || 0), arr.length - 1);
-  const h = arr[i];
-  if (h === undefined || isNaN(Number(h))) {
-    labelEl.textContent = 'N/A';
-    arrowEl.style.transform = 'rotate(0deg)';
+function tryParseFile(file, callback) {
+  const name = (file.name || '').toLowerCase();
+  fileNameSpan.textContent = file.name;
+  statusEl.textContent = 'Loading file...';
+  if (name.endsWith('.csv')) {
+    const reader = new FileReader();
+    reader.onload = (ev)=> {
+      const rows = parseCSV(ev.target.result);
+      callback(rows);
+    };
+    reader.readAsText(file);
+  } else if (name.endsWith('.xls') || name.endsWith('.xlsx')) {
+    const reader = new FileReader();
+    reader.onload = (ev)=> {
+      const data = new Uint8Array(ev.target.result);
+      const workbook = XLSX.read(data, {type:'array'});
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      callback(rows);
+    };
+    reader.readAsArrayBuffer(file);
   } else {
-    arrowEl.style.transform = `rotate(${Number(h)}deg)`;
-    labelEl.textContent = `${Number(h).toFixed(0)}°`;
+    statusEl.textContent = 'Unsupported file type.';
   }
 }
 
-// Format distance as 0.0m (no space)
-function formatDistance(v) {
-  if (typeof v !== 'number' || isNaN(v)) return '0.0m';
-  return `${v.toFixed(1)}m`;
+/* -------------------------------
+   Column detection helpers
+   ------------------------------- */
+function detectColumns(rows) {
+  if (!rows || !rows.length) return [];
+  const sample = rows[0];
+  const names = Object.keys(sample);
+  return names;
 }
 
-////////////////// Interpolation ////////////////////
-// linear interpolate array at given grid distances
+function findColumnName(names, candidates) {
+  // names: array of column names
+  // candidates: array of possible matches ordered, e.g. ['lat','latitude']
+  const lower = names.map(n=>n.toLowerCase());
+  for (const c of candidates) {
+    const i = lower.indexOf(c.toLowerCase());
+    if (i!==-1) return names[i];
+  }
+  // approximate: check if any contains substring
+  for (const c of candidates) {
+    const found = names.find(n => n.toLowerCase().includes(c.toLowerCase()));
+    if (found) return found;
+  }
+  return null;
+}
+
+/* -------------------------------
+   Numeric helpers
+   ------------------------------- */
+function toNumber(v, fallback=NaN) {
+  if (v===undefined || v===null || v==='') return fallback;
+  if (typeof v === 'number') return v;
+  // attempt parse float removing commas
+  const s = String(v).trim().replace(/,/g,'');
+  const n = Number(s);
+  if (!isNaN(n)) return n;
+  // try time mm:ss.mmm -> seconds
+  const m = s.match(/(\d+):(\d+)\.(\d+)/);
+  if (m) return parseInt(m[1])*60 + parseInt(m[2]) + parseInt(m[3])/(m[3].length===3?1000:1);
+  return fallback;
+}
+
+/* -------------------------------
+   Resampling helpers
+   ------------------------------- */
+function getUniqueLapsFromRows(rows) {
+  const laps = new Set();
+  rows.forEach(r=>{
+    if (r.lap !== undefined && r.lap !== '') laps.add(String(r.lap));
+  });
+  return Array.from(laps).sort((a,b)=>Number(a)-Number(b));
+}
+
 function interpolateArray(points, fieldName, gridArr) {
-  // points: [{distance, ...}, ...] sorted by distance
   const res = new Array(gridArr.length).fill(NaN);
-  if (points.length === 0) return res;
-  // Build arrays
-  const xs = points.map(p => toNumber(p.distance, 0));
-  const ys = points.map(p => toNumber(p[fieldName], NaN));
-  // For each grid x, find enclosing segment
+  if (!points || points.length===0) return res;
+  const xs = points.map(p=>toNumber(p.distance,0));
+  const ys = points.map(p=>toNumber(p[fieldName], NaN));
   let i = 0;
-  for (let g = 0; g < gridArr.length; g++) {
+  for (let g=0; g<gridArr.length; g++) {
     const x = gridArr[g];
     while (i < xs.length - 2 && x > xs[i+1]) i++;
-    if (x < xs[0]) {
+    if (x <= xs[0]) {
       res[g] = ys[0];
-    } else if (x > xs[xs.length-1]) {
+    } else if (x >= xs[xs.length-1]) {
       res[g] = ys[ys.length-1];
     } else {
-      const x0 = xs[i], x1 = xs[i+1];
-      const y0 = ys[i], y1 = ys[i+1];
-      if (isNaN(y0) || isNaN(y1) || x1 === x0) {
+      const x0 = xs[i], x1 = xs[i+1], y0 = ys[i], y1 = ys[i+1];
+      if (isNaN(y0) || isNaN(y1) || x1===x0) {
         res[g] = isNaN(y0) ? y1 : y0;
       } else {
         const t = (x - x0) / (x1 - x0);
@@ -272,17 +459,14 @@ function interpolateArray(points, fieldName, gridArr) {
   return res;
 }
 
-////////////////// Resample a lap to 0.1m grid ////////////////////
-function resampleLap(points, step = 0.1) {
-  if (!points || points.length === 0) return null;
-  // sort points by distance
-  points.sort((a,b) => toNumber(a.distance,0) - toNumber(b.distance,0));
-  const d0 = toNumber(points[0].distance, 0);
-  const dmax = toNumber(points[points.length-1].distance, 0);
+function resampleLap(points, step=0.1) {
+  if (!points || points.length===0) return null;
+  points.sort((a,b)=>toNumber(a.distance,0)-toNumber(b.distance,0));
+  const d0 = toNumber(points[0].distance,0);
+  const dmax = toNumber(points[points.length-1].distance,0);
   const count = Math.floor((dmax - d0) / step) + 1;
   const g = Array.from({length: count+1}, (_,i) => +(d0 + i*step).toFixed(3));
-  // pick fields to resample
-  const fields = ['time','speed','brake','gas','heading','wheel_fl','wheel_fr','wheel_rl','wheel_rr','steering'];
+  const fields = ['time','speed','brake','gas','heading','lat','lon','latitude','longitude'];
   const out = { dist: g };
   fields.forEach(f => {
     out[f] = interpolateArray(points, f, g);
@@ -291,33 +475,107 @@ function resampleLap(points, step = 0.1) {
   return out;
 }
 
-////////////////// Chart setup ////////////////////
-const ctxTime = document.getElementById('chartTime').getContext('2d');
-const ctxSpeed = document.getElementById('chartSpeed').getContext('2d');
-const ctxBrake = document.getElementById('chartBrake').getContext('2d');
-const ctxGas = document.getElementById('chartGas').getContext('2d');
-
-function buildChart(ctx, label, yLabel) {
-  return new Chart(ctx, {
-    type: 'line',
-    data: { labels: [], datasets: [] },
-    options: {
-      responsive:true,
-      maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#fff'}}},
-      scales:{
-        x:{ticks:{color:'#ddd'}, grid:{color:'#222'}},
-        y:{title:{display:true,text:yLabel,color:'#ddd'}, ticks:{color:'#ddd'}, grid:{color:'#222'}}
-      }
+/* -------------------------------
+   File load handler
+   ------------------------------- */
+fileInput.addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if (!f) return;
+  tryParseFile(f, (rows)=> {
+    if (!rows || rows.length===0) {
+      statusEl.textContent = 'Empty file';
+      return;
     }
+    onFileRowsLoaded(rows);
   });
+});
+
+function onFileRowsLoaded(rows) {
+  // Reset
+  parsedData = {};
+  resampled = {};
+  availableLaps = [];
+  grid = [];
+  lapA = lapB = null;
+  mapA = mapB = [];
+  currentPointA = currentPointB = null;
+
+  // detect columns
+  const cols = detectColumns(rows);
+  detectedColumns = cols;
+  detectedColsEl.textContent = cols.join(', ');
+  statusEl.textContent = 'Parsing rows...';
+
+  // normalize: ensure each row has distance field numeric. If 'distance' not found try 'dist' or 'distance_m' etc.
+  let distanceCol = findColumnName(cols, ['distance','dist','d']);
+  if (!distanceCol) {
+    // If only lat/lon and time but no distance, try to compute distance from lat/lon cumulative (not implemented auto)
+    statusEl.textContent = 'No distance column detected. Please include distance (m) column.';
+    return;
+  }
+
+  // group by lap if present
+  const hasLap = cols.map(c=>c.toLowerCase()).includes('lap');
+  if (hasLap) {
+    rows.forEach(r => {
+      const key = String(r.lap);
+      if (!parsedData[key]) parsedData[key] = [];
+      parsedData[key].push(r);
+    });
+  } else {
+    parsedData['1'] = rows;
+  }
+
+  availableLaps = Object.keys(parsedData).sort((a,b)=>Number(a)-Number(b));
+  // populate selects
+  lapASelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l=>`<option value="${l}">Lap ${l}</option>`).join('');
+  lapBSelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l=>`<option value="${l}">Lap ${l}</option>`).join('');
+
+  // find global max distance
+  let globalMax = 0;
+  availableLaps.forEach(l => {
+    const pts = parsedData[l];
+    pts.forEach(p => {
+      const d = toNumber(p[distanceCol], 0);
+      if (d > globalMax) globalMax = d;
+      // ensure standardized property 'distance'
+      p.distance = toNumber(p[distanceCol], 0);
+      // standardize lat/lon fields if present
+      // detection: choose lat/lon column names
+    });
+  });
+
+  const step = 0.1;
+  const nsteps = Math.floor(globalMax / step) + 1;
+  grid = Array.from({length: nsteps+1}, (_,i) => +(i*step).toFixed(3));
+  // resample each lap
+  availableLaps.forEach(l => {
+    // ensure each point has lat & lon keys (if present under different names)
+    const pts = parsedData[l];
+    // detect lat/lon column names for this dataset
+    const colsThis = Object.keys(pts[0]);
+    const latCol = findColumnName(colsThis, ['lat','latitude']);
+    const lonCol = findColumnName(colsThis, ['lon','longitude','lng']);
+    // create normalized keys
+    pts.forEach(p => {
+      if (latCol) p.lat = p[latCol];
+      if (lonCol) p.lon = p[lonCol];
+    });
+    resampled[l] = resampleLap(pts, step);
+    // if lat/lon are present in original rows, also resampled will contain lat/lon arrays
+  });
+
+  statusEl.textContent = 'File loaded. Select laps to compare.';
+  fileNameSpan.textContent = 'Loaded';
+  // set charts
+  updateChartsForSelection();
+  // draw empty map
+  drawMap();
 }
 
-const chartTime = buildChart(ctxTime,'Time','Time (s)');
-const chartSpeed = buildChart(ctxSpeed,'Speed','Speed');
-const chartBrake = buildChart(ctxBrake,'Brake','Brake');
-const chartGas = buildChart(ctxGas,'Gas','Gas');
-
+/* -------------------------------
+   Update charts
+   ------------------------------- */
 function updateChartsForSelection() {
   if (!grid.length) return;
   const labels = grid.map(d => d.toFixed(1));
@@ -326,36 +584,28 @@ function updateChartsForSelection() {
   chartBrake.data.labels = labels;
   chartGas.data.labels = labels;
 
-  const datasetsTime = [];
-  const datasetsSpeed = [];
-  const datasetsBrake = [];
-  const datasetsGas = [];
+  const datasetsTime = [], datasetsSpeed = [], datasetsBrake = [], datasetsGas = [];
 
   if (lapA && resampled[lapA]) {
     datasetsTime.push({
       label: `Lap ${lapA}`,
       data: resampled[lapA].time.map(v => isNaN(v) ? null : +v),
-      borderColor: '#ffd54a',
-      borderWidth: 1.8,
-      pointRadius: 0
+      borderColor: '#ffd54a', borderWidth:1.8, pointRadius:0
     });
     datasetsSpeed.push({
       label: `Lap ${lapA}`,
       data: resampled[lapA].speed.map(v => isNaN(v) ? null : +v),
-      borderColor: '#ffd54a',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#ffd54a', borderWidth:1.8, pointRadius:0
     });
     datasetsBrake.push({
       label: `Lap ${lapA}`,
       data: resampled[lapA].brake.map(v => isNaN(v) ? null : +v),
-      borderColor: '#ffd54a',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#ffd54a', borderWidth:1.8, pointRadius:0
     });
     datasetsGas.push({
       label: `Lap ${lapA}`,
       data: resampled[lapA].gas.map(v => isNaN(v) ? null : +v),
-      borderColor: '#ffd54a',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#ffd54a', borderWidth:1.8, pointRadius:0
     });
   }
 
@@ -363,27 +613,22 @@ function updateChartsForSelection() {
     datasetsTime.push({
       label: `Lap ${lapB}`,
       data: resampled[lapB].time.map(v => isNaN(v) ? null : +v),
-      borderColor: '#9b59b6',
-      borderWidth: 1.8,
-      pointRadius: 0
+      borderColor: '#9b59b6', borderWidth:1.8, pointRadius:0
     });
     datasetsSpeed.push({
       label: `Lap ${lapB}`,
       data: resampled[lapB].speed.map(v => isNaN(v) ? null : +v),
-      borderColor: '#9b59b6',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#9b59b6', borderWidth:1.8, pointRadius:0
     });
     datasetsBrake.push({
       label: `Lap ${lapB}`,
       data: resampled[lapB].brake.map(v => isNaN(v) ? null : +v),
-      borderColor: '#9b59b6',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#9b59b6', borderWidth:1.8, pointRadius:0
     });
     datasetsGas.push({
       label: `Lap ${lapB}`,
       data: resampled[lapB].gas.map(v => isNaN(v) ? null : +v),
-      borderColor: '#9b59b6',
-      borderWidth: 1.8, pointRadius:0
+      borderColor: '#9b59b6', borderWidth:1.8, pointRadius:0
     });
   }
 
@@ -398,189 +643,290 @@ function updateChartsForSelection() {
   chartGas.update();
 }
 
-///////////////////// Playback //////////////////////
-function startPlayback() {
-  if (!grid.length) {
-    alert('No resampled data available. Select laps first.');
+/* -------------------------------
+   Heading display
+   ------------------------------- */
+function setHeadingForLap(lap, arrowEl, labelEl, idx=0) {
+  if (!arrowEl || !labelEl) return;
+  if (!lap || !resampled[lap] || !Array.isArray(resampled[lap].heading)) {
+    labelEl.textContent = 'N/A';
+    arrowEl.style.transform = 'rotate(0deg)';
     return;
   }
-  const interval = Math.max(10, Number(intervalInput.value) || 50);
+  const arr = resampled[lap].heading;
+  const i = Math.min(Math.max(0, idx || 0), arr.length-1);
+  const h = arr[i];
+  if (h===undefined || isNaN(Number(h))) {
+    labelEl.textContent = 'N/A';
+    arrowEl.style.transform = 'rotate(0deg)';
+  } else {
+    arrowEl.style.transform = `rotate(${Number(h)}deg)`;
+    labelEl.textContent = `${Number(h).toFixed(0)}°`;
+  }
+}
+
+/* -------------------------------
+   Playback controls
+   ------------------------------- */
+function startPlayback() {
+  if (!grid.length) { alert('No resampled data available. Load file first.'); return; }
+  const interval = Math.max(10, Number(intervalInput.value)||50);
   stopPlayback();
   playIndex = 0;
-  playTimer = setInterval(() => {
+  playTimer = setInterval(()=>{
     stepPlayback();
-    if (playIndex >= grid.length-1) {
-      stopPlayback();
-    }
+    if (playIndex >= grid.length-1) stopPlayback();
   }, interval);
   statusEl.textContent = 'Playing...';
 }
-
 function stepPlayback() {
-  const d = grid[playIndex];
-  currentDistanceEl.textContent = formatDistance(d);
-  currentStepEl.textContent = `${playIndex}`;
-  // Update headings for lap A and lap B if available
-  if (lapA && resampled[lapA] && Array.isArray(resampled[lapA].heading)) {
-    setHeadingForLap(lapA, headingArrowA, headingLabelA, playIndex);
-    setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, playIndex);
+  const d = grid[playIndex] || 0;
+  currentDistanceEl.textContent = `${(d).toFixed(1)}m`;
+  // update headings
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, playIndex);
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, playIndex);
+  // update map markers (if lat/lon exist in resampled)
+  if (lapA && resampled[lapA]) {
+    // decide which arrays contain lat/lon: prefer 'lat'/'lon' then 'latitude'/'longitude'
+    let la = null, lo = null;
+    if (resampled[lapA].lat && resampled[lapA].lon) { la = resampled[lapA].lat[playIndex]; lo = resampled[lapA].lon[playIndex]; }
+    else if (resampled[lapA].latitude && resampled[lapA].longitude) { la = resampled[lapA].latitude[playIndex]; lo = resampled[lapA].longitude[playIndex]; }
+    if (la !== undefined && lo !== undefined) {
+      currentPointA = project(Number(la), Number(lo));
+      // transform projected into normalized map coordinates (mapA already normalized around center)
+      // We'll pick nearest point in mapA (they share grid spacing) to get matching center offset
+      // Keep the marker position as projected coords relative to center
+    }
   }
-  if (lapB && resampled[lapB] && Array.isArray(resampled[lapB].heading)) {
-    setHeadingForLap(lapB, headingArrowB, headingLabelB, playIndex);
-    setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, playIndex);
+  if (lapB && resampled[lapB]) {
+    let la=null, lo=null;
+    if (resampled[lapB].lat && resampled[lapB].lon) { la = resampled[lapB].lat[playIndex]; lo = resampled[lapB].lon[playIndex]; }
+    else if (resampled[lapB].latitude && resampled[lapB].longitude) { la = resampled[lapB].latitude[playIndex]; lo = resampled[lapB].longitude[playIndex]; }
+    if (la !== undefined && lo !== undefined) {
+      currentPointB = project(Number(la), Number(lo));
+    }
   }
-  // optional: update marker on charts by adding vertical line/annotation
-  // for performance we only update the charts' tooltip position (simple approach)
-  // Here we simply update nothing else — charts are prepopulated and show both laps.
+  // Draw
+  drawMap();
   playIndex++;
 }
-
 function pausePlayback() {
-  if (playTimer) {
-    clearInterval(playTimer); playTimer=null;
-    statusEl.textContent = 'Paused';
-  }
+  if (playTimer) { clearInterval(playTimer); playTimer = null; statusEl.textContent = 'Paused'; }
 }
-
 function stopPlayback() {
-  if (playTimer) {
-    clearInterval(playTimer); playTimer = null;
-  }
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
   playIndex = 0;
-  currentDistanceEl.textContent = formatDistance(0);
-  currentStepEl.textContent = `0`;
+  currentDistanceEl.textContent = '0.0m';
   statusEl.textContent = 'Stopped';
-  // reset heading to initial for both laps
-  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
   setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
-  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
   setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+  currentPointA = currentPointB = null;
+  drawMap();
 }
 
-///////////////////// File handling ///////////////////////
-fileInput.addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  fileNameSpan.textContent = f.name;
-  statusEl.textContent = 'Loading file...';
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const rows = parseCSV(ev.target.result);
-      onCSVLoaded(rows);
-      statusEl.textContent = 'File loaded. Select laps to compare.';
-    } catch (err) {
-      statusEl.textContent = 'Parse error: ' + err.message;
-    }
-  };
-  reader.readAsText(f);
-});
-
-function onCSVLoaded(rows) {
-  // Reset state
-  parsedData = {};
-  resampled = {};
-  availableLaps = [];
-
-  if (!rows || rows.length === 0) {
-    statusEl.textContent = 'Empty CSV';
-    return;
-  }
-
-  // Normalize headers to lower-case keys are already applied in parseCSV
-  // Group by lap if present
-  const hasLap = rows[0].hasOwnProperty('lap');
-  if (hasLap) {
-    rows.forEach(r => {
-      const lapKey = r.lap;
-      if (!parsedData[lapKey]) parsedData[lapKey] = [];
-      parsedData[lapKey].push(r);
-    });
-  } else {
-    // treat entire file as lap 1
-    parsedData['1'] = rows;
-  }
-
-  availableLaps = Object.keys(parsedData).sort((a,b) => Number(a)-Number(b));
-  // populate selects
-  lapASelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l => `<option value="${l}">Lap ${l}</option>`).join('');
-  lapBSelect.innerHTML = `<option value="">(choose)</option>` + availableLaps.map(l => `<option value="${l}">Lap ${l}</option>`).join('');
-
-  // Pre-resample all laps to common grid
-  // find global max distance
-  let globalMax = 0;
-  availableLaps.forEach(l => {
-    const pts = parsedData[l];
-    pts.forEach(p => {
-      const d = toNumber(p.distance, 0);
-      if (d > globalMax) globalMax = d;
-    });
-  });
-  const step = 0.1;
-  const nsteps = Math.floor(globalMax / step) + 1;
-  grid = Array.from({length: nsteps+1}, (_,i) => +(i*step).toFixed(3));
-  maxDistanceEl.textContent = formatDistance(globalMax);
-
-  availableLaps.forEach(l => {
-    resampled[l] = resampleLap(parsedData[l], step);
-  });
-
-  // default clear selections
-  lapA = null; lapB = null;
-  // Apply initial lap param if present
-  if (initialLapParam) {
-    if (availableLaps.includes(initialLapParam)) {
-      lapASelect.value = initialLapParam;
-      lapA = initialLapParam;
-      setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
-      setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
-      statusEl.textContent = `Lap A: ${lapA} selected via URL`;
-    }
-  }
-  // reset heading displays
-  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
-  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
-  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
-  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
-  updateChartsForSelection();
+/* -------------------------------
+   Map drawing & projection
+   ------------------------------- */
+// Simple equirectangular projection to meters
+function project(lat, lon) {
+  // returns meters in world coords
+  const x = lon * 111320 * Math.cos((lat*Math.PI)/180); // approximate
+  const y = lat * 110540;
+  return { x, y };
 }
 
-//////////////////// UI interactions /////////////////////
-lapASelect.addEventListener('change', () => {
-  const v = lapASelect.value;
-  lapA = v || null;
+function normalizeTrackFromLatLon(latArr, lonArr) {
+  if (!latArr || !lonArr) return [];
+  const pts = [];
+  for (let i=0;i<latArr.length;i++){
+    const la = toNumber(latArr[i], NaN);
+    const lo = toNumber(lonArr[i], NaN);
+    if (isNaN(la) || isNaN(lo)) continue;
+    pts.push(project(la, lo));
+  }
+  if (!pts.length) return [];
+  const cx = pts.reduce((a,b)=>a+b.x,0)/pts.length;
+  const cy = pts.reduce((a,b)=>a+b.y,0)/pts.length;
+  return pts.map(p => ({ x: p.x - cx, y: p.y - cy }));
+}
+
+function prepareMapPaths() {
+  mapA = []; mapB = [];
   if (lapA && resampled[lapA]) {
-    statusEl.textContent = `Lap A: ${lapA} selected.`;
+    // find lat/lon arrays inside resampled
+    const r = resampled[lapA];
+    const lat = r.lat || r.latitude || null;
+    const lon = r.lon || r.longitude || null;
+    if (lat && lon) mapA = normalizeTrackFromLatLon(lat, lon);
   }
-  // set initial heading display for lap A
-  setHeadingForLap(lapA, headingArrowA, headingLabelA, playIndex || 0);
-  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, playIndex || 0);
-  updateChartsForSelection();
-});
-
-lapBSelect.addEventListener('change', () => {
-  const v = lapBSelect.value;
-  lapB = v || null;
   if (lapB && resampled[lapB]) {
-    statusEl.textContent = `Lap B: ${lapB} selected.`;
+    const r = resampled[lapB];
+    const lat = r.lat || r.latitude || null;
+    const lon = r.lon || r.longitude || null;
+    if (lat && lon) mapB = normalizeTrackFromLatLon(lat, lon);
   }
-  // set initial heading display for lap B
-  setHeadingForLap(lapB, headingArrowB, headingLabelB, playIndex || 0);
-  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, playIndex || 0);
-  updateChartsForSelection();
+  drawMap();
+}
+
+function fitMapToPaths() {
+  // compute bounding box of A+B and adjust mapState.zoom to fit comfortably
+  const all = (mapA||[]).concat(mapB||[]);
+  if (!all.length) return;
+  const xs = all.map(p=>p.x), ys = all.map(p=>p.y);
+  const minx = Math.min(...xs), maxx = Math.max(...xs);
+  const miny = Math.min(...ys), maxy = Math.max(...ys);
+  const w = maxx - minx, h = maxy - miny;
+  const pad = 1.2;
+  const cvsW = gpsCanvas.width;
+  const cvsH = gpsCanvas.height;
+  if (w===0 || h===0) return;
+  const scaleX = cvsW / (w*pad);
+  const scaleY = cvsH / (h*pad);
+  mapState.zoom = Math.min(scaleX, scaleY);
+  // center (pan set to 0)
+  mapState.panX = 0; mapState.panY = 0;
+  mapState.rotation = 0;
+  drawMap();
+}
+
+function drawMap() {
+  // ensure canvas pixel size matches display size for crispness
+  const rect = gpsCanvas.getBoundingClientRect();
+  const DPR = window.devicePixelRatio || 1;
+  if (gpsCanvas.width !== Math.floor(rect.width * DPR) || gpsCanvas.height !== Math.floor(rect.height * DPR)) {
+    gpsCanvas.width = Math.floor(rect.width * DPR);
+    gpsCanvas.height = Math.floor(rect.height * DPR);
+  }
+  const ctx = gpsCtx;
+  ctx.save();
+  ctx.clearRect(0,0,gpsCanvas.width,gpsCanvas.height);
+  // center and apply pan/zoom/rotate
+  ctx.translate(gpsCanvas.width/2 + mapState.panX*DPR, gpsCanvas.height/2 + mapState.panY*DPR);
+  ctx.scale(mapState.zoom * DPR, mapState.zoom * DPR);
+  ctx.rotate(mapState.rotation);
+
+  // draw paths with reduced lineWidth scaled by zoom
+  if (mapA && mapA.length>1) {
+    ctx.beginPath();
+    ctx.lineWidth = 2 / (mapState.zoom || 1);
+    ctx.strokeStyle = '#ffd54a';
+    ctx.moveTo(mapA[0].x, mapA[0].y);
+    for (let i=1;i<mapA.length;i++) ctx.lineTo(mapA[i].x, mapA[i].y);
+    ctx.stroke();
+  }
+  if (mapB && mapB.length>1) {
+    ctx.beginPath();
+    ctx.lineWidth = 2 / (mapState.zoom || 1);
+    ctx.strokeStyle = '#9b59b6';
+    ctx.moveTo(mapB[0].x, mapB[0].y);
+    for (let i=1;i<mapB.length;i++) ctx.lineTo(mapB[i].x, mapB[i].y);
+    ctx.stroke();
+  }
+
+  // draw currentPoint markers (transform world coords -> current canvas transform is already applied)
+  // If currentPointX are world-projected but not centered, we need to subtract center offsets used in normalizeTrack
+  // We used normalized mapA/mapB centered at 0. We'll approximate marker by finding nearest point index in map arrays based on playIndex.
+  if (currentPointA && mapA.length>0 && resampled[lapA]) {
+    // find nearest grid index for playIndex to place marker onto normalized coordinates
+    const idx = Math.min(playIndex, resampled[lapA].dist.length-1);
+    if (mapA[idx]) {
+      ctx.beginPath();
+      ctx.fillStyle = '#ffd54a';
+      ctx.arc(mapA[idx].x, mapA[idx].y, 6 / (mapState.zoom||1), 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  if (currentPointB && mapB.length>0 && resampled[lapB]) {
+    const idx = Math.min(playIndex, resampled[lapB].dist.length-1);
+    if (mapB[idx]) {
+      ctx.beginPath();
+      ctx.fillStyle = '#9b59b6';
+      ctx.arc(mapB[idx].x, mapB[idx].y, 6 / (mapState.zoom||1), 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+/* -------------------------------
+   Map interactions
+   ------------------------------- */
+let lastWheelTime = 0;
+gpsCanvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  // zoom toward pointer (simple focused zoom)
+  const delta = e.deltaY < 0 ? 1.12 : 0.88;
+  mapState.zoom = Math.max(0.0001, mapState.zoom * delta);
+  drawMap();
+}, {passive:false});
+
+gpsCanvas.addEventListener('mousedown', (e)=>{
+  const rect = gpsCanvas.getBoundingClientRect();
+  mapState.lastX = e.clientX;
+  mapState.lastY = e.clientY;
+  if (e.button === 0) { mapState.isPanning = true; }
+  if (e.button === 2) { mapState.isRotating = true; }
+});
+gpsCanvas.addEventListener('mousemove', (e)=>{
+  if (mapState.isPanning) {
+    const dx = e.clientX - mapState.lastX;
+    const dy = e.clientY - mapState.lastY;
+    mapState.panX += dx;
+    mapState.panY += dy;
+    mapState.lastX = e.clientX; mapState.lastY = e.clientY;
+    drawMap();
+  } else if (mapState.isRotating) {
+    const dx = e.clientX - mapState.lastX;
+    mapState.rotation += dx * 0.01;
+    mapState.lastX = e.clientX;
+    drawMap();
+  }
+});
+gpsCanvas.addEventListener('mouseup', ()=>{
+  mapState.isPanning = false; mapState.isRotating = false;
+});
+gpsCanvas.addEventListener('mouseleave', ()=>{
+  mapState.isPanning = false; mapState.isRotating = false;
+});
+gpsCanvas.addEventListener('contextmenu', (e)=> e.preventDefault());
+resetViewBtn.addEventListener('click', ()=>{
+  mapState.zoom = 1; mapState.panX = 0; mapState.panY = 0; mapState.rotation = 0;
+  drawMap();
 });
 
+/* -------------------------------
+   UI event wiring
+   ------------------------------- */
+lapASelect.addEventListener('change', ()=>{
+  lapA = lapASelect.value || null;
+  if (lapA) statusEl.textContent = `Lap A: ${lapA} selected.`;
+  else statusEl.textContent = 'Lap A cleared.';
+  // prepare map path
+  prepareMapPaths();
+  updateChartsForSelection();
+  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
+  updateSectorPanel();
+});
+lapBSelect.addEventListener('change', ()=>{
+  lapB = lapBSelect.value || null;
+  if (lapB) statusEl.textContent = `Lap B: ${lapB} selected.`;
+  else statusEl.textContent = 'Lap B cleared.';
+  prepareMapPaths();
+  updateChartsForSelection();
+  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+  updateSectorPanel();
+});
 selectLapA.addEventListener('click', ()=> lapASelect.focus());
 selectLapB.addEventListener('click', ()=> lapBSelect.focus());
-
-clearSel.addEventListener('click', ()=> {
-  lapASelect.value = ''; lapBSelect.value = '';
-  lapA = null; lapB = null;
-  setHeadingForLap(lapA, headingArrowA, headingLabelA, 0);
-  setHeadingForLap(lapB, headingArrowB, headingLabelB, 0);
-  setHeadingForLap(lapA, headingArrowA_small, headingLabelA_small, 0);
-  setHeadingForLap(lapB, headingArrowB_small, headingLabelB_small, 0);
+clearSel.addEventListener('click', ()=>{
+  lapASelect.value=''; lapBSelect.value=''; lapA=lapB=null;
+  resampled = resampled || {};
+  currentPointA = currentPointB = null;
+  mapA=[]; mapB=[];
   updateChartsForSelection();
+  drawMap();
+  updateSectorPanel();
   statusEl.textContent = 'Selection cleared.';
 });
 
@@ -588,35 +934,38 @@ playBtn.addEventListener('click', ()=> startPlayback());
 pauseBtn.addEventListener('click', ()=> pausePlayback());
 stopBtn.addEventListener('click', ()=> stopPlayback());
 
-// Back/Close handler: match dashboard behaviour (attempt to close the window)
-const _closeTab = document.getElementById('closeTab');
-if (_closeTab) {
-  _closeTab.addEventListener('click', () => {
-    window.close();
-  });
-  _closeTab.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault(); window.close();
-    }
-  });
-}
+/* -------------------------------
+   Window resize -> redraw map
+   ------------------------------- */
+window.addEventListener('resize', ()=> {
+  drawMap();
+});
 
-///////////////////// Demo/sample data (optional) /////////////////////
-// If you want quick demo without CSV, uncomment the block below to create dummy laps.
+/* -------------------------------
+   Helpful demo loader (optional)
+   If you want to test without a file, uncomment createDemo() below
+   ------------------------------- */
 /*
-(function createDemo(){
+function createDemo() {
   const demo1 = [];
   const demo2 = [];
-  for(let i=0;i<=500;i++){
+  for (let i=0;i<=500;i++){
     const d = +(i*0.1).toFixed(3);
-    demo1.push({distance:d, time:(i*0.02).toFixed(3), speed:(Math.sin(i/50)*20+50).toFixed(2), brake:(i%50<5?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2)});
-    demo2.push({distance:d, time:(i*0.019+0.3).toFixed(3), speed:(Math.sin(i/55)*22+48).toFixed(2), brake:(i%40<4?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2)});
+    // create fake lat/lon around a center
+    const latBase = 1.350 + Math.sin(i/80)*0.0005;
+    const lonBase = 103.666 + Math.cos(i/80)*0.0005;
+    demo1.push({lap:'1', distance:d, time:(i*0.02).toFixed(3), speed:(Math.sin(i/50)*20+50).toFixed(2), brake: (i%50<5?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2), lat:latBase, lon:lonBase, heading: (i%360) });
+    demo2.push({lap:'2', distance:d, time:(i*0.019+0.3).toFixed(3), speed:(Math.sin(i/55)*22+48).toFixed(2), brake:(i%40<4?Math.random()*1:0).toFixed(2), gas:(Math.random()*1).toFixed(2), lat:latBase+0.0002, lon:lonBase+0.0002, heading: (i%360) });
   }
-  parsedData = {'3': demo1, '5': demo2};
-  onCSVLoaded(Object.values(parsedData).flat());
-})();
+  parsedData = {'1': demo1, '2': demo2};
+  onFileRowsLoaded(Object.values(parsedData).flat());
+}
+createDemo();
 */
 
+/* -------------------------------
+   End of script
+   ------------------------------- */
 </script>
 </body>
 </html>
