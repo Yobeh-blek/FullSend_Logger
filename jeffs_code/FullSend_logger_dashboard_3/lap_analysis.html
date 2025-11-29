@@ -329,6 +329,13 @@ let playIndex = 0;
 
 let detectedColumns = []; // list of column names from file
 
+// close tab button
+document.getElementById('closeTab').addEventListener('click', () => {
+    //window.location.href = "dashboard.html";
+    window.close();
+});
+
+
 // Map state
 const mapState = {
   zoom: 1,
