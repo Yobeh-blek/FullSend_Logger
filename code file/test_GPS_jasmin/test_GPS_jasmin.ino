@@ -1,14 +1,14 @@
 #include <HardwareSerial.h>
 #include <TinyGPSPlus.h>
 
-
 TinyGPSPlus gps;
-HardwareSerial GPS_Serial(2);
+HardwareSerial GPS_Serial(1);
 
 #define GPS_RX_PIN 18   // ESP32 RX  ← GPS TX
 #define GPS_TX_PIN 17   // ESP32 TX  → GPS RX
 #define GPS_BAUD   9600 // NEO-M8L default
-unsigned long lastPrint = 0;
+// #define GPS_BAUD 115200 // NEO-M8L default
+
 
 void setup() {
   Serial.begin(115200);
@@ -18,9 +18,9 @@ void setup() {
 
 void loop() {
   while (GPS_Serial.available()>0) {
-    char c = GPS_Serial.read();  // READ ONCE
-    gps.encode(c);               // feed parser
-    Serial.write(c);             // print raw GPS data    
+    char c = GPS_Serial.read();  
+    gps.encode(c);               
+    Serial.write(c);               
     // If GPS received data should be e.g."$GNGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47"
   }
   
@@ -38,6 +38,8 @@ void loop() {
   else 
   {
     Serial.println("Waiting for GPS fix...");
-    delay(5000);
+    delay(50000);
   }
 }
+
+
