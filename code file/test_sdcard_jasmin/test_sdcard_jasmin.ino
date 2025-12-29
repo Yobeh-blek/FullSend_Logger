@@ -37,14 +37,17 @@ void setup() {
     return;
   }
   Serial.println("SD card mounted successfully!");
+  printMainMenu();
 }
 
 
 void loop() {
   if (!Serial.available()) return;
-  String input = Serial.readString();
+
+  String input = Serial.readStringUntil('\n');
   input.trim();
   if (input.length() == 0) return;
+
   Serial.print("Received: ");
   Serial.println(input);
 
@@ -54,6 +57,7 @@ void loop() {
       int index = input.toInt();
       readSelectedFile(index);
       currentState = STATE_IDLE;
+      printMainMenu();
       break;
     }
 
@@ -61,12 +65,14 @@ void loop() {
       int index = input.toInt();
       deleteSelectedFile(index);
       currentState = STATE_IDLE;
+      printMainMenu();
       break;
     }
 
     case STATE_IDLE: {
       if (input == "1") {
         createLogFile();
+        printMainMenu();
       }
       else if (input == "2") {
         listFilesForReading("/Folder1");
@@ -75,6 +81,10 @@ void loop() {
       else if (input == "3") {
         listFilesForDeletion("/Folder1");
         currentState = STATE_WAIT_DELETE_INDEX;
+      }
+      else {
+        Serial.println("Invalid option!");
+        printMainMenu();
       }
       break;
     }
@@ -257,3 +267,13 @@ String getNextLogFilename() {
   return ""; // No available filename
 }
 
+
+void printMainMenu() {
+  Serial.println();
+  Serial.println("========== SD CARD MENU ==========");
+  Serial.println("[1] Create CSV file");
+  Serial.println("[2] Read CSV file");
+  Serial.println("[3] Delete CSV file");
+  Serial.println("Enter your choice:");
+  Serial.println("==================================");
+}
