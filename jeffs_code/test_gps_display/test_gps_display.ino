@@ -17,7 +17,7 @@
 U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 
 
-static const int RXPin = 20, TXPin = 21;
+static const int RXPin = 16, TXPin = 17;
 static const int GPSBaud = 9600;
 
 // The TinyGPS++ object

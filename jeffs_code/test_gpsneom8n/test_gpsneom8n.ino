@@ -5,7 +5,7 @@
    It requires the use of SoftwareSerial, and assumes that you have a
    4800-baud serial GPS device hooked up on pins 4(rx) and 3(tx).
 */
-static const int RXPin = 20, TXPin = 21;
+static const int RXPin = 16, TXPin = 17;
 static const int GPSBaud = 9600;
 
 // The TinyGPS++ object
@@ -14,11 +14,11 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
+
 void setup()
 {
   Serial.begin(115200);
   ss.begin(GPSBaud);
-
   Serial.println(F("DeviceExample.ino"));
   Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
   Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());

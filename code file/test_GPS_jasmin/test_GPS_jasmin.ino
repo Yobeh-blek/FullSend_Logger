@@ -11,7 +11,7 @@ HardwareSerial GPS_Serial(1);
 
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("ESP32-S3 + NEO-M8L GPS");
   GPS_Serial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 }
@@ -41,5 +41,3 @@ void loop() {
     delay(50000);
   }
 }
-
-
