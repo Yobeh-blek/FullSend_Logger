@@ -8,7 +8,7 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55,0x29);
 void setup() {
   Serial.begin(115200);
   Serial.println("BNO055 Sensor Test");
-  Wire.begin(6, 7);  // SDA = GPIO 6, SCL = GPIO 7
+  Wire.begin(8, 9);  // SDA = GPIO 8, SCL = GPIO 9
   // Initialize the sensor
   if (!bno.begin()) {
     Serial.println("Error: Could not find a BNO055 sensor!");
