@@ -76,26 +76,27 @@ void setup()
   Serial.begin(115200);
   delay(1000);
 
-  // Start GPS at default 9600
-  GPS.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN); // RX, TX pins
+  // Start GPS at default baud
+  GPS.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   delay(500);
 
-  // Send UBX command to change baud rate
+  // Switch GPS baud to 115200
   GPS.write(UBX_SET_BAUD_115200, sizeof(UBX_SET_BAUD_115200));
   GPS.flush();
-  delay(200);
+  delay(300);
 
-  // Restart UART at 115200
   GPS.end();
   delay(200);
   GPS.begin(115200, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  delay(300);
 
-  // Set update rate (5 Hz recommended)
-  GPS.write(setRate5Hz, sizeof(setRate5Hz));
+  // Set update rate to 5 Hz
+//  GPS.write(setRate5Hz, sizeof(setRate5Hz));
+  GPS.write(setRate10Hz, sizeof(setRate10Hz));
   GPS.flush();
   delay(100);
 
-  Serial.println("GPS switched to 115200 @5Hz");
+  Serial.println("GPS running @115200, 10Hz");
 }
 
 void loop()
@@ -105,9 +106,13 @@ void loop()
     gps.encode(GPS.read());
   }
 
-  if (gps.location.isUpdated())
-  {
-    displayInfo();
+  static uint32_t last = millis();
+  if (GPS.available()) {
+    GPS.read();
+    if (millis() - last >= 200) {
+      displayInfo();
+      last = millis();
+    }
   }
 
   // Debug only if truly no data
@@ -135,6 +140,15 @@ void displayInfo()
   else
   {
     Serial.print(F("INVALID"));
+  }
+
+  Serial.print(F(" "));
+  Serial.print("  Speed: ");
+  if (gps.speed.isValid()) {
+    Serial.print(gps.speed.kmph(), 3);
+    Serial.print(" km/h");
+  } else {
+    Serial.print("INVALID");
   }
 
   Serial.print(F("  Date/Time: "));
@@ -170,6 +184,6 @@ void displayInfo()
   {
     Serial.print(F("INVALID"));
   }
-
+  
   Serial.println();
 }
