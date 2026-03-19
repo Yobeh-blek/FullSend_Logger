@@ -1,0 +1,24 @@
+ROOT/
+│
+├── index.html          ← MAIN PAGE (Leaderboard)
+│
+├── Pages/
+│   ├── data.html
+│   ├── graph.html
+│   └── prediction.html
+│
+├── Scripts/
+│   ├── leaderboard.js   ← (from Full Send Logger)
+│   ├── readfiles.js
+│   ├── storefiles.js
+│   └── buttons.js
+│
+├── CSS/
+│   ├── style.css        ← shared styles
+│   └── leaderboard.css ← Full Send styles
+│
+├── Images/
+│
+├── Storage/
+│   └── sessions/
+│       └── *.csv

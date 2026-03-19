@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lap Time Prediction</title>
+  <link rel="stylesheet" href="../CSS/style.css">
+</head>
+<body>
+
+<h2>Lap Time Prediction</h2>
+
+<label>Track Length (m):</label>
+<input type="number" id="distance">
+
+<label>Average Speed (km/h):</label>
+<input type="number" id="avgSpeed">
+
+<button onclick="predict()">Predict</button>
+
+<p id="result"></p>
+
+<script>
+function predict() {
+  const d = document.getElementById('distance').value;
+  const v = document.getElementById('avgSpeed').value;
+  const time = (d / (v / 3.6)).toFixed(2);
+  document.getElementById('result').innerText =
+    `Predicted Lap Time: ${time} seconds`;
+}
+</script>
+
+</body>
+</html>

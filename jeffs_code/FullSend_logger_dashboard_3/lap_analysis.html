@@ -62,6 +62,33 @@
 
   #gpsMap { flex: 1;/* canvas grows to fill height */ min-height: 220px;/* keep your original size */ }
 
+
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .hidden { display: none; }
+
+  .modal-content {
+    background: #111;
+    padding: 20px;
+    border-radius: 8px;
+    width: 300px;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+  }
+
+
+
+
 </style>
 </head>
 <body>
@@ -260,6 +287,22 @@
     <div class="chartWrap"><canvas id="chartGas"></canvas></div>
   </div>
 </div>
+
+<!-- Multi Lap Selector Modal -->
+<div id="lapModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Select Laps for Comparison</h3>
+
+    <div id="lapList"></div>
+
+    <div class="modal-actions">
+      <button onclick="confirmLapSelection()">Confirm</button>
+      <button onclick="closeLapModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 
 <!-- Note Taking Panel -->
 <div class="panel" style="margin-top:12px;">
@@ -1211,6 +1254,98 @@ stopBtn.addEventListener('click', ()=> stopPlayback());
 window.addEventListener('resize', ()=> {
   drawMap();
 });
+
+let loadedLaps = {};
+let selectedLaps = [];
+async function openLapSelector() {
+    document.getElementById("lapModal").classList.remove("hidden");
+
+    // Example: fetch lap list from server
+    const response = await fetch("/laps/index.json");
+    const lapFiles = await response.json();
+
+    const lapList = document.getElementById("lapList");
+    lapList.innerHTML = "";
+
+    lapFiles.forEach(lap => {
+        lapList.innerHTML += `
+          <label>
+            <input type="checkbox" value="${lap}">
+            ${lap}
+          </label><br>
+        `;
+    });
+}
+
+async function confirmLapSelection() {
+    const checkboxes = document.querySelectorAll("#lapList input:checked");
+    selectedLaps = [];
+
+    for (const cb of checkboxes) {
+        selectedLaps.push(cb.value);
+        await preloadLapData(cb.value);
+    }
+
+    closeLapModal();
+    renderAllCharts();
+}
+
+function closeLapModal() {
+    document.getElementById("lapModal").classList.add("hidden");
+}
+
+async function preloadLapData(lapName) {
+    if (loadedLaps[lapName]) return;
+
+    const res = await fetch(`/laps/${lapName}`);
+    const csv = await res.text();
+
+    const raw = parseCSV(csv);
+    loadedLaps[lapName] = interpolateAt0_1m(raw);
+}
+
+
+function renderSpeedGraph() {
+    const datasets = selectedLaps.map((lap, i) => ({
+        label: lap,
+        data: loadedLaps[lap].map(p => ({ x: p.distance, y: p.speed })),
+        borderWidth: 2
+    }));
+
+    new Chart(
+        document.getElementById("speedGraph").getContext("2d"),
+        {
+            type: "line",
+            data: { datasets },
+            options: {
+                parsing: false,
+                scales: {
+                    x: { type: "linear", title: { display: true, text: "Distance (m)" }},
+                    y: { title: { display: true, text: "Speed" }}
+                }
+            }
+        }
+    );
+}
+
+function renderAllCharts() {
+    if (selectedLaps.length === 0) return;
+
+    renderSpeedGraph();
+    renderBrakeGraph();
+    renderThrottleGraph();
+    renderSteeringGraph();
+    renderTimeDeltaGraph();
+}
+
+const lapColors = [
+  "#FFD700", "#7C4DFF", "#4CAF50", "#FF5722", "#03A9F4"
+];
+
+function getLapColor(index) {
+  return lapColors[index % lapColors.length];
+}
+
 
 /* -------------------------------
    Helpful demo loader (optional)
