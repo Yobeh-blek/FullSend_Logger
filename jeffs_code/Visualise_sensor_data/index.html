@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IMU & Magnetometer Data Viewer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial; margin: 20px; background:#f0f0f0; }
+        .box { background:white; padding:20px; border-radius:10px; margin-bottom:20px; }
+        #plot2d, #plot3d, #track2d { width:100%; height:500px; }
+        button { padding:10px; margin:5px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>Sensor CSV Viewer</h2>
+    <input type="file" id="fileInput"><br><br>
+
+    <button onclick="plotMag()">Magnetometer</button>
+    <button onclick="plotAcc()">Acceleration</button>
+    <button onclick="plotHeading()">Heading</button>
+    <button onclick="plotMag3D()">3D Magnetometer</button>
+    <button onclick="plotAcc3D()">3D Acceleration</button>
+    <button onclick="plotTrack()">2D Track</button>
+    <button onclick="plotPosition3D()">3D Position</button>
+</div>
+
+<div class="box"><div id="plot2d"></div></div>
+<div class="box"><div id="plot3d"></div></div>
+<div class="box"><div id="track2d"></div></div>
+
+<script>
+let data = [];
+
+function timeToSeconds(timeString){
+    // Example input: "3/23/2026 4:39:12 PM"
+    let timePart = timeString.split(' ')[1]; // "4:39:12"
+    let ampm = timeString.split(' ')[2];     // "PM"
+
+    let parts = timePart.split(':');
+    let h = parseInt(parts[0]);
+    let m = parseInt(parts[1]);
+    let s = parseInt(parts[2]);
+
+    if (ampm === "PM" && h !== 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+
+    return h*3600 + m*60 + s;
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+    let file = e.target.files[0];
+    let reader = new FileReader();
+
+    reader.onload = function(event){
+        let lines = event.target.result.split('\n');
+        data = [];
+
+        for(let i=1;i<lines.length;i++){
+            let row = lines[i].split(',');
+            if(row.length >= 8){
+                data.push({
+                    time: timeToSeconds(row[0]),
+                    magX: parseFloat(row[1]),
+                    magY: parseFloat(row[2]),
+                    magZ: parseFloat(row[3]),
+                    accX: parseFloat(row[4]),
+                    accY: parseFloat(row[5]),
+                    accZ: parseFloat(row[6]),
+                    heading: parseFloat(row[7])
+                });
+            }
+        }
+        alert("CSV Loaded");
+    };
+    reader.readAsText(file);
+});
+
+function plotMag(){
+    Plotly.newPlot('plot2d', [
+        {x: data.map(d=>d.time), y: data.map(d=>d.magX), name:'Mag X'},
+        {x: data.map(d=>d.time), y: data.map(d=>d.magY), name:'Mag Y'},
+        {x: data.map(d=>d.time), y: data.map(d=>d.magZ), name:'Mag Z'}
+    ], {title:'Magnetometer'});
+}
+
+function plotAcc(){
+    Plotly.newPlot('plot2d', [
+        {x: data.map(d=>d.time), y: data.map(d=>d.accX), name:'Acc X'},
+        {x: data.map(d=>d.time), y: data.map(d=>d.accY), name:'Acc Y'},
+        {x: data.map(d=>d.time), y: data.map(d=>d.accZ), name:'Acc Z'}
+    ], {title:'Acceleration'});
+}
+
+function plotHeading(){
+    Plotly.newPlot('plot2d', [
+        {x: data.map(d=>d.time), y: data.map(d=>d.heading), name:'Heading'}
+    ], {title:'Heading vs Time'});
+}
+
+function plotMag3D(){
+    Plotly.newPlot('plot3d', [{
+        x: data.map(d=>d.magX),
+        y: data.map(d=>d.magY),
+        z: data.map(d=>d.magZ),
+        mode: 'lines',
+        type: 'scatter3d'
+    }], {title:'3D Magnetometer'});
+}
+
+function plotAcc3D(){
+    Plotly.newPlot('plot3d', [{
+        x: data.map(d=>d.accX),
+        y: data.map(d=>d.accY),
+        z: data.map(d=>d.accZ),
+        mode: 'lines',
+        type: 'scatter3d'
+    }], {title:'3D Acceleration'});
+}
+
+// Track reconstruction from heading (dead reckoning)
+function plotTrack(){
+    let x=[0], y=[0];
+    let vx=0, vy=0;
+
+    // ---- Bias removal (first 100 samples) ----
+    let ax_bias=0, ay_bias=0;
+    let sampleCount = 100;
+
+    for(let i=0;i<sampleCount;i++){
+        ax_bias += data[i].accX;
+        ay_bias += data[i].accY;
+    }
+    ax_bias /= sampleCount;
+    ay_bias /= sampleCount;
+
+    for(let i=1;i<data.length;i++){
+        let dt = data[i].time - data[i-1].time;
+
+        let headingRad = data[i].heading * Math.PI/180;
+
+        // Remove bias (BNO055 linear accel already in m/s²)
+        let accForward = data[i].accX - ax_bias;
+
+        // Convert forward acceleration into world frame
+        let worldX = accForward * Math.sin(headingRad);
+        let worldY = accForward * Math.cos(headingRad);
+
+        // Integrate acceleration → velocity
+        vx += worldX * dt;
+        vy += worldY * dt;
+
+        // ---- Zero velocity update (when not accelerating) ----
+        if(Math.abs(accForward) < 0.05){
+            vx *= 0.9;
+            vy *= 0.9;
+        }
+
+        // ---- Drag model ----
+        vx *= 0.995;
+        vy *= 0.995;
+
+        // Integrate velocity → position
+        x.push(x[i-1] + vx * dt);
+        y.push(y[i-1] + vy * dt);
+    }
+
+    Plotly.newPlot('track2d', [{
+        x:x,
+        y:y,
+        mode:'lines'
+    }], {
+        title:'2D Track (INS with Drift Reduction)',
+        xaxis:{title:'Meters'},
+        yaxis:{title:'Meters', scaleanchor:"x"}
+    });
+}
+
+function plotPosition3D(){
+    let px=[0], py=[0], pz=[0];
+    let vx=0, vy=0, vz=0;
+
+    // ---- Bias removal ----
+    let ax_bias=0, ay_bias=0, az_bias=0;
+    let sampleCount = 100;
+
+    for(let i=0;i<sampleCount;i++){
+        ax_bias += data[i].accX;
+        ay_bias += data[i].accY;
+        az_bias += data[i].accZ;
+    }
+    ax_bias /= sampleCount;
+    ay_bias /= sampleCount;
+    az_bias /= sampleCount;
+
+    for(let i=1;i<data.length;i++){
+        let dt = data[i].time - data[i-1].time;
+        let headingRad = data[i].heading * Math.PI/180;
+
+        let accX = data[i].accX - ax_bias;
+        let accY = data[i].accY - ay_bias;
+        let accZ = data[i].accZ - az_bias;
+
+        // Rotate to world frame
+        let worldX = accX * Math.sin(headingRad);
+        let worldY = accX * Math.cos(headingRad);
+        let worldZ = accZ;
+
+        // Integrate
+        vx += worldX * dt;
+        vy += worldY * dt;
+        vz += worldZ * dt;
+
+        // Zero velocity correction
+        if(Math.abs(accX) < 0.05){
+            vx *= 0.9;
+            vy *= 0.9;
+        }
+
+        // Drag
+        vx *= 0.995;
+        vy *= 0.995;
+        vz *= 0.995;
+
+        px.push(px[i-1] + vx * dt);
+        py.push(py[i-1] + vy * dt);
+        pz.push(pz[i-1] + vz * dt);
+    }
+
+    Plotly.newPlot('plot3d', [{
+        x: px,
+        y: py,
+        z: pz,
+        mode: 'lines',
+        type: 'scatter3d'
+    }], {
+        title:'3D Position (INS)'
+    });
+}
+
+</script>
+
+</body>
+</html>
