@@ -26,8 +26,10 @@ File logFile;
 String logFileName;
 
 // ---------- WIFI TIME ----------
-const char* ssid     = "Cindy6803_2.4GHz";
-const char* password = "51245143";
+// const char* ssid     = "Cindy6803_2.4GHz";
+// const char* password = "51245143";
+const char* ssid     = "SMD_General";
+const char* password = "SmdGeneral@2024";
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 8 * 3600;
@@ -35,6 +37,9 @@ const int   daylightOffset_sec = 0;
 
 unsigned long lastLog = 0;
 const int logInterval = 16; // 60Hz
+
+unsigned long startTime = 0;
+
 
 // ---------- CREATE FILE ----------
 String createFileName() {
@@ -112,7 +117,7 @@ void setup() {
 
   Serial.println("Time synced!");
   Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
-
+  startTime = millis();
   // Turn off WiFi
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -124,13 +129,14 @@ void setup() {
 
   logFile = SD.open(logFileName, FILE_WRITE);
   if (logFile) {
-    logFile.println("time,accX,accY,accZ,magX,magY,magZ,heading,pitch,roll,yaw,gyroZ");
+    logFile.println("time_ms,accX,accY,accZ,magX,magY,magZ,heading,pitch,roll,yaw,gyroX,gyroY,gyroZ");
     logFile.flush();
   }
 }
 
 // ---------- LOOP ----------
 void loop() {
+  
   if (millis() - lastLog >= logInterval) {
     lastLog = millis();
     sensors_event_t mag_event;
@@ -148,16 +154,19 @@ void loop() {
     float yaw   = euler_event.orientation.x;
     float roll  = euler_event.orientation.y;
     float pitch = euler_event.orientation.z;
-    float gyroZ = gyro_event.gyro.z;
+    float gyroX = gyro_event.gyro.x * DEG_TO_RAD;
+    float gyroY = gyro_event.gyro.y * DEG_TO_RAD;
+    float gyroZ = gyro_event.gyro.z * DEG_TO_RAD;
 
     float heading = atan2(mag_event.magnetic.y, mag_event.magnetic.x);
     if (heading < 0) heading += 2 * PI;
     float headingDegrees = heading * 180 / PI;
 
-    String timeNow = getTimeString();
+    
 
     // Write to SD
     if (logFile) {
+      unsigned long timeNow = millis() - startTime;
       logFile.print(timeNow); logFile.print(",");
 
       logFile.print(accel_event.acceleration.x); logFile.print(",");
@@ -172,6 +181,8 @@ void loop() {
       logFile.print(pitch); logFile.print(",");
       logFile.print(roll); logFile.print(",");
       logFile.print(yaw); logFile.print(",");
+      logFile.print(gyroX);logFile.print(",");
+      logFile.print(gyroY);logFile.print(",");
       logFile.println(gyroZ);
 
       logFile.flush();

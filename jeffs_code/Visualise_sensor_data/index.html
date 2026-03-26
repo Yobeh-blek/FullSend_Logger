@@ -23,6 +23,7 @@
     <button onclick="plotAcc3D()">3D Acceleration</button>
     <button onclick="plotTrack()">2D Track</button>
     <button onclick="plotPosition3D()">3D Position</button>
+    <button onclick="applyKalmanFilter()">Kalman Filter Acceleration</button>
 </div>
 
 <div class="box"><div id="plot2d"></div></div>
@@ -31,6 +32,87 @@
 
 <script>
 let data = [];
+
+class KalmanFilter {
+    constructor() {
+        this.Q_angle = 0.001;
+        this.Q_bias = 0.003;
+        this.R_measure = 0.03;
+
+        this.angle = 0;
+        this.bias = 0;
+        this.P = [[0,0],[0,0]];
+    }
+
+    update(newAngle, newRate, dt) {
+        // Prediction
+        this.angle += dt * (newRate - this.bias);
+
+        this.P[0][0] += dt * (dt*this.P[1][1] - this.P[0][1] - this.P[1][0] + this.Q_angle);
+        this.P[0][1] -= dt * this.P[1][1];
+        this.P[1][0] -= dt * this.P[1][1];
+        this.P[1][1] += this.Q_bias * dt;
+
+        // Update
+        let S = this.P[0][0] + this.R_measure;
+        let K0 = this.P[0][0] / S;
+        let K1 = this.P[1][0] / S;
+
+        let y = newAngle - this.angle;
+        this.angle += K0 * y;
+        this.bias += K1 * y;
+
+        let P00 = this.P[0][0];
+        let P01 = this.P[0][1];
+
+        this.P[0][0] -= K0 * P00;
+        this.P[0][1] -= K0 * P01;
+        this.P[1][0] -= K1 * P00;
+        this.P[1][1] -= K1 * P01;
+
+        return this.angle;
+    }
+}
+
+function applyKalmanFilter(){
+    let kalmanRoll = new KalmanFilter();
+    let kalmanPitch = new KalmanFilter();
+
+    let rollArr = [];
+    let pitchArr = [];
+    let timeArr = [];
+
+    for(let i=1;i<data.length;i++){
+        let dt = data[i].time - data[i-1].time;
+        if(dt <= 0 || dt > 0.1) dt = 0.016;
+
+        // Accelerometer angle
+        let rollAcc = Math.atan2(data[i].accY, data[i].accZ) * 180/Math.PI;
+        let pitchAcc = Math.atan2(-data[i].accX,
+                        Math.sqrt(data[i].accY**2 + data[i].accZ**2)) * 180/Math.PI;
+
+        // Gyro rate (rad/s)
+        let gyroRollRate = data[i].gyroX * 180/Math.PI;
+        let gyroPitchRate = data[i].gyroY * 180/Math.PI;
+
+        // Kalman
+        let roll = kalmanRoll.update(rollAcc, gyroRollRate, dt);
+        let pitch = kalmanPitch.update(pitchAcc, gyroPitchRate, dt);
+
+        rollArr.push(roll);
+        pitchArr.push(pitch);
+        timeArr.push(data[i].time);
+    }
+
+    Plotly.newPlot('plot2d', [
+        {x: timeArr, y: rollArr, name:'Roll (Kalman)'},
+        {x: timeArr, y: pitchArr, name:'Pitch (Kalman)'}
+    ], {
+        title:'Kalman Filter Angle'
+    });
+}
+
+
 
 function timeToSeconds(timeString){
     // Example input: "3/23/2026 4:39:12 PM"
@@ -58,16 +140,22 @@ document.getElementById('fileInput').addEventListener('change', function(e){
 
         for(let i=1;i<lines.length;i++){
             let row = lines[i].split(',');
-            if(row.length >= 8){
+            if(row.length >= 14){
                 data.push({
-                    time: timeToSeconds(row[0]),
-                    magX: parseFloat(row[1]),
-                    magY: parseFloat(row[2]),
-                    magZ: parseFloat(row[3]),
-                    accX: parseFloat(row[4]),
-                    accY: parseFloat(row[5]),
-                    accZ: parseFloat(row[6]),
-                    heading: parseFloat(row[7])
+                    time: parseFloat(row[0]) / 1000.0,
+                    accX: parseFloat(row[1]),
+                    accY: parseFloat(row[2]),
+                    accZ: parseFloat(row[3]),
+                    magX: parseFloat(row[4]),
+                    magY: parseFloat(row[5]),
+                    magZ: parseFloat(row[6]),
+                    heading: parseFloat(row[7]),
+                    pitch: parseFloat(row[8]),
+                    roll: parseFloat(row[9]),
+                    yaw: parseFloat(row[10]),
+                    gyroX: parseFloat(row[11]),
+                    gyroY: parseFloat(row[12]),
+                    gyroZ: parseFloat(row[13])
                 });
             }
         }
@@ -121,48 +209,36 @@ function plotAcc3D(){
 // Track reconstruction from heading (dead reckoning)
 function plotTrack(){
     let x=[0], y=[0];
-    let vx=0, vy=0;
+    let speed=0;
 
-    // ---- Bias removal (first 100 samples) ----
-    let ax_bias=0, ay_bias=0;
+    // Bias removal
+    let ax_bias=0;
     let sampleCount = 100;
 
     for(let i=0;i<sampleCount;i++){
         ax_bias += data[i].accX;
-        ay_bias += data[i].accY;
     }
     ax_bias /= sampleCount;
-    ay_bias /= sampleCount;
 
     for(let i=1;i<data.length;i++){
         let dt = data[i].time - data[i-1].time;
+        if(dt <= 0 || dt > 0.1) dt = 0.016;
 
         let headingRad = data[i].heading * Math.PI/180;
-
-        // Remove bias (BNO055 linear accel already in m/s²)
         let accForward = data[i].accX - ax_bias;
 
-        // Convert forward acceleration into world frame
-        let worldX = accForward * Math.sin(headingRad);
-        let worldY = accForward * Math.cos(headingRad);
+        // integrate acceleration → speed
+        speed += accForward * dt;
 
-        // Integrate acceleration → velocity
-        vx += worldX * dt;
-        vy += worldY * dt;
+        // drag
+        speed *= 0.995;
 
-        // ---- Zero velocity update (when not accelerating) ----
-        if(Math.abs(accForward) < 0.05){
-            vx *= 0.9;
-            vy *= 0.9;
-        }
+        // integrate speed → position
+        let newX = x[i-1] + speed * dt * Math.sin(headingRad);
+        let newY = y[i-1] + speed * dt * Math.cos(headingRad);
 
-        // ---- Drag model ----
-        vx *= 0.995;
-        vy *= 0.995;
-
-        // Integrate velocity → position
-        x.push(x[i-1] + vx * dt);
-        y.push(y[i-1] + vy * dt);
+        x.push(newX);
+        y.push(newY);
     }
 
     Plotly.newPlot('track2d', [{
@@ -170,7 +246,7 @@ function plotTrack(){
         y:y,
         mode:'lines'
     }], {
-        title:'2D Track (INS with Drift Reduction)',
+        title:'2D Track (Speed + Heading)',
         xaxis:{title:'Meters'},
         yaxis:{title:'Meters', scaleanchor:"x"}
     });
