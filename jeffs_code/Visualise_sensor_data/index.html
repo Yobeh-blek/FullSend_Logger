@@ -24,6 +24,8 @@
     <button onclick="plotTrack()">2D Track</button>
     <button onclick="plotPosition3D()">3D Position</button>
     <button onclick="applyKalmanFilter()">Kalman Filter Acceleration</button>
+    <button onclick="plotAirspeed()">Airspeed vs Time</button>
+    <button onclick="plotAirspeedHeading()">Airspeed + Heading</button>
 </div>
 
 <div class="box"><div id="plot2d"></div></div>
@@ -311,6 +313,50 @@ function plotPosition3D(){
         type: 'scatter3d'
     }], {
         title:'3D Position (INS)'
+    });
+}
+
+function plotAirspeed(){
+    Plotly.newPlot('plot2d', [{
+        x: data.map(d=>d.time),
+        y: data.map(d=>d.airspeed),
+        name:'Airspeed',
+        line: {width:2}
+    }], {
+        title:'Airspeed vs Time',
+        xaxis:{title:'Time (s)'},
+        yaxis:{title:'Speed (m/s)'}
+    });
+}
+
+function plotAirspeedHeading(){
+    Plotly.newPlot('plot2d', [
+        {
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.airspeed),
+            name:'Airspeed',
+            yaxis:'y1',
+            line:{width:2}
+        },
+        {
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.heading),
+            name:'Heading',
+            yaxis:'y2',
+            line:{width:2}
+        }
+    ], {
+        title:'Airspeed & Heading vs Time',
+        xaxis:{title:'Time (s)'},
+        yaxis:{
+            title:'Speed (m/s)',
+            side:'left'
+        },
+        yaxis2:{
+            title:'Heading (deg)',
+            overlaying:'y',
+            side:'right'
+        }
     });
 }
 

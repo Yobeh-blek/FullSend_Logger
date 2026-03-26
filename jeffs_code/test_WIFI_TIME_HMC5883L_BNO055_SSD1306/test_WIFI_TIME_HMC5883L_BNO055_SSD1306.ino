@@ -26,14 +26,21 @@ File logFile;
 String logFileName;
 
 // ---------- WIFI TIME ----------
-// const char* ssid     = "Cindy6803_2.4GHz";
-// const char* password = "51245143";
-const char* ssid     = "SMD_General";
-const char* password = "SmdGeneral@2024";
-
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 8 * 3600;
 const int   daylightOffset_sec = 0;
+
+struct WiFiNetwork {
+  const char* ssid;
+  const char* password;
+};
+
+// Add multiple WiFi here
+WiFiNetwork wifiList[] = {
+  {"Cindy6803_2.4GHz", "51245143"},
+  {"Jeff Fong", "1234567890"},
+  {"SMD_General", "SmdGeneral@2024"}
+};
 
 unsigned long lastLog = 0;
 const int logInterval = 16; // 60Hz
@@ -68,6 +75,54 @@ String getTimeString() {
   return String(timeString);
 }
 
+
+bool connectToWiFi() {
+  int numNetworks = sizeof(wifiList) / sizeof(wifiList[0]);
+
+  for (int i = 0; i < numNetworks; i++) {
+    Serial.print("Trying WiFi: ");
+    Serial.println(wifiList[i].ssid);
+
+    WiFi.begin(wifiList[i].ssid, wifiList[i].password);
+
+    int retry = 0;
+    while (WiFi.status() != WL_CONNECTED && retry < 10) {
+      delay(500);
+      Serial.print(".");
+      retry++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nConnected to: " + String(wifiList[i].ssid));
+      return true;
+    }
+
+    Serial.println("\nFailed, trying next WiFi...");
+  }
+
+  return false;
+}
+
+void syncTimeWithNTP() {
+  if (connectToWiFi()) {
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+    struct tm timeinfo;
+    while (!getLocalTime(&timeinfo)) {
+      Serial.println("Waiting for NTP time...");
+      delay(500);
+    }
+
+    Serial.println("Time synced:");
+    Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  } else {
+    Serial.println("No WiFi found, cannot sync time.");
+  }
+}
+
 // ---------- SETUP ----------
 void setup() {
   Serial.begin(115200);
@@ -99,7 +154,7 @@ void setup() {
   Serial.println("SD Card Ready");
 
   // WiFi Time Sync
-  WiFi.begin(ssid, password);
+  syncTimeWithNTP();
   Serial.print("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -133,6 +188,7 @@ void setup() {
     logFile.flush();
   }
 }
+
 
 // ---------- LOOP ----------
 void loop() {
