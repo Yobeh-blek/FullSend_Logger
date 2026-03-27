@@ -91,6 +91,13 @@
       </div>
     </div>
 
+    <div class="panel data">
+      <div class="inner">
+        <div class="title">Sensor Analysis</div>
+        <div style="margin-top:14px" class="enter" id="sensorEnter">Enter</div>
+      </div>
+    </div>
+
     <div class="historyWrap">
       <h2>History</h2>
       <div class="history" id="historyArea">
@@ -106,6 +113,8 @@
 
   </div>
 
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
   <script>
     // Simple interactive behaviors for the single-file demo
     const browseBtn = document.getElementById('browseBtn');
@@ -116,31 +125,30 @@
     const historyArea = document.getElementById('historyArea');
     const radioEnter = document.getElementById('radioEnter');
     const dataEnter = document.getElementById('dataEnter');
+    const sensorEnter = document.getElementById('sensorEnter');
 
+    // Browse file
     browseBtn.addEventListener('click', ()=> fileInput.click());
+
     fileInput.addEventListener('change', (e)=>{
       const f = e.target.files[0];
       if(f){ browseBtn.textContent = f.name; }
       addLog(`Selected file: ${f?f.name:'(none)'}`);
     });
-    
-    openBtn.addEventListener('click', ()=> {
+
+    // Open file
+    openBtn.addEventListener('click', ()=>{
       const filename = browseBtn.textContent;
       if(filename === 'Browse'){
         alert('Please select a file first');
         addLog('Open failed: no file selected');
         return;
       }
-      const ext = filename.split('.').pop().toLowerCase();
-      if(ext === 'csv' || ext === 'xlsx' ){
-        addLog(`Opening file: ${filename}`);
-        // File opening logic here
-      } else {
-        alert(`Warning: "${filename}" is not an accepted format.\nPlease use CSV or Excel files (.csv, .xlsx)`);
-        addLog(`Open failed: invalid format "${ext}"`);
-      }
+      addLog(`Opening file: ${filename}`);
     });
-    saveBtn.addEventListener('click', ()=> {
+
+    // Save file
+    saveBtn.addEventListener('click', ()=>{
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob([''], {type: 'text/plain'}));
       link.download = 'export.csv';
@@ -148,45 +156,146 @@
       URL.revokeObjectURL(link.href);
       addLog('Save dialog opened');
     });
-    cancelBtn.addEventListener('click', ()=> {
+
+    // Cancel file
+    cancelBtn.addEventListener('click', ()=>{
       browseBtn.textContent = 'Browse';
       fileInput.value = '';
       addLog('Cancel pressed — file cleared');
     });
+
+    // Navigation buttons
     radioEnter.addEventListener('click', ()=> addLog('Entered Radio Comm'));
-    dataEnter.addEventListener('click', ()=> {
-      addLog('Entered Data View');
-      // open new tab with dashboard
+
+    dataEnter.addEventListener('click', ()=>{
       window.open('dashboard.html', '_blank');
     });
-      document.getElementById('dataModal').style.display='flex';
-    
-      document.getElementById('closeDataModal').addEventListener('click', ()=>{
-      document.getElementById('dataModal').style.display='none';
-    });('click', () => {
-      document.getElementById('dataPage').style.display='none';
-      document.querySelector('.container').style.display='block';
-    });('click', ()=> {
-      addLog('Entered Data View');
-      document.getElementById('dataModal').style.display='flex';
-    });('click', ()=> addLog('Entered Data View'));
 
+    sensorEnter.addEventListener('click', ()=>{
+      window.open('sensor_analysis.html', '_blank');
+    });
+
+    // Log function
     function addLog(t){
       const d = document.createElement('div');
       d.className='logLine';
       d.textContent = t;
-      d.style.height='20px';
       d.style.padding='4px';
       d.style.color='#bde';
-      d.style.display='flex';
-      d.style.alignItems='center';
       d.style.fontSize='12px';
       historyArea.appendChild(d);
       historyArea.scrollTop = historyArea.scrollHeight;
     }
 
+  
+    let data = [];
+    function plotSpeed(){
+        Plotly.newPlot('plot2d', [{
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.speed),
+            name:'Speed'
+        }], {title:'Speed vs Time'});
+    }
+
+    function plotDistance(){
+        let dist=[0];
+        for(let i=1;i<data.length;i++){
+            let dt = data[i].time - data[i-1].time;
+            let speed = data[i].speed || 0;
+            dist.push(dist[i-1] + speed * dt);
+        }
+
+        Plotly.newPlot('plot2d', [{
+            x: data.map(d=>d.time),
+            y: dist,
+            name:'Distance'
+        }], {title:'Distance vs Time'});
+    }
+
+    function plotLateralG(){
+        Plotly.newPlot('plot2d', [{
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.accY / 9.81),
+            name:'Lateral G'
+        }], {title:'Lateral G'});
+    }
+
+    function plotLongitudinalG(){
+        Plotly.newPlot('plot2d', [{
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.accX / 9.81),
+            name:'Longitudinal G'
+        }], {title:'Longitudinal G'});
+    }
+
+    function plotYawRate(){
+        Plotly.newPlot('plot2d', [{
+            x: data.map(d=>d.time),
+            y: data.map(d=>d.gyroZ),
+            name:'Yaw Rate'
+        }], {title:'Yaw Rate'});
+    }
+
+    function plotTrackSpeed(){
+        let x=[0], y=[0];
+        let speed=0;
+
+        for(let i=1;i<data.length;i++){
+            let dt = data[i].time - data[i-1].time;
+            let headingRad = data[i].heading * Math.PI/180;
+            speed = data[i].speed || speed;
+
+            x.push(x[i-1] + speed * dt * Math.sin(headingRad));
+            y.push(y[i-1] + speed * dt * Math.cos(headingRad));
+        }
+
+        Plotly.newPlot('track2d', [{
+            x:x,
+            y:y,
+            mode:'lines',
+            line:{
+                color: data.map(d=>d.speed),
+                colorscale:'Jet',
+                width:4
+            }
+        }], {
+            title:'Track Map Colored by Speed',
+            xaxis:{title:'Meters'},
+            yaxis:{title:'Meters', scaleanchor:"x"}
+        });
+    }
+
+    document.getElementById('sensorEnter').addEventListener('click', ()=>{
+      window.open('sensor_analysis.html', '_blank');
+    });
     // preload some demo messages
     ['System ready','Last file loaded: session.csv','Radio: COM3 connected','Data stream: 1.2MB received'].forEach(addLog);
+
+    let csvDataGlobal = null;
+
+    openBtn.addEventListener('click', ()=>{
+      const file = fileInput.files[0];
+      if(!file){
+        alert('Please select a file first');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const text = e.target.result;
+        const rows = text.split('\n').slice(1).map(line=>{
+          const cols = line.split(',');
+          return {
+            lapTime: cols[1],   // adjust based on your CSV format
+            time: cols[0]
+          };
+        });
+        csvDataGlobal = rows;
+        addLog('CSV loaded into memory');
+      };
+      reader.readAsText(file);
+    });
+
   </script>
   <!-- Data Subpage Modal -->
   <div id="dataModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
